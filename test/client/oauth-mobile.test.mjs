@@ -2,7 +2,7 @@ import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
 import { GhaymaAuth, AuthError, PKCE_STORAGE_KEY, pkceChallenge } from "../../dist/client/index.js";
-import { APP_SLUG, BASE_URL, sessionResponse, stubFetch } from "./helpers.mjs";
+import { APP_SLUG, BASE_URL, clearBrowser, fakeBrowser, sessionResponse, stubFetch } from "./helpers.mjs";
 
 const VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 const CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
@@ -88,40 +88,8 @@ describe("signInWithIdToken", () => {
 });
 
 // ==================== Browser helpers ====================
-// The client entry never imports node:, so a browser is simulated with the
-// three globals these helpers touch: location, sessionStorage and history.
 
-/** Install fake browser globals; returns the sessionStorage backing map. */
-function fakeBrowser({ search = "", hash = "" } = {}) {
-  const store = new Map();
-  globalThis.location = {
-    pathname: "/cb",
-    search,
-    hash,
-    assigned: null,
-    assign(url) {
-      this.assigned = url;
-    },
-  };
-  globalThis.sessionStorage = {
-    getItem: (key) => (store.has(key) ? store.get(key) : null),
-    setItem: (key, value) => store.set(key, value),
-    removeItem: (key) => store.delete(key),
-  };
-  globalThis.history = {
-    url: null,
-    replaceState(_state, _title, url) {
-      this.url = url;
-    },
-  };
-  return store;
-}
-
-afterEach(() => {
-  delete globalThis.location;
-  delete globalThis.sessionStorage;
-  delete globalThis.history;
-});
+afterEach(clearBrowser);
 
 describe("signInWithOAuth", () => {
   test("pkce parks a verifier and redirects with its challenge", async () => {

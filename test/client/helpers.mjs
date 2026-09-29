@@ -55,4 +55,40 @@ export function sessionResponse(accessToken = "access-1", expiresIn = 3600) {
   };
 }
 
+// The client entry never imports node:, so a browser is simulated with the
+// three globals its OAuth helpers touch: location, sessionStorage and history.
+
+/** Install fake browser globals; returns the sessionStorage backing map. */
+export function fakeBrowser({ search = "", hash = "" } = {}) {
+  const store = new Map();
+  globalThis.location = {
+    pathname: "/cb",
+    search,
+    hash,
+    assigned: null,
+    assign(url) {
+      this.assigned = url;
+    },
+  };
+  globalThis.sessionStorage = {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, value),
+    removeItem: (key) => store.delete(key),
+  };
+  globalThis.history = {
+    url: null,
+    replaceState(_state, _title, url) {
+      this.url = url;
+    },
+  };
+  return store;
+}
+
+/** Remove what fakeBrowser installed. */
+export function clearBrowser() {
+  delete globalThis.location;
+  delete globalThis.sessionStorage;
+  delete globalThis.history;
+}
+
 export { BASE_URL, APP_SLUG };
