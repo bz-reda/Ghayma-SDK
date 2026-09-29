@@ -77,8 +77,13 @@ export function fakeBrowser({ search = "", hash = "" } = {}) {
   };
   globalThis.history = {
     url: null,
+    // Like a browser: the new URL replaces the location's path, query and fragment
     replaceState(_state, _title, url) {
       this.url = url;
+      const next = new URL(url, "https://app.test");
+      globalThis.location.pathname = next.pathname;
+      globalThis.location.search = next.search;
+      globalThis.location.hash = next.hash;
     },
   };
   return store;

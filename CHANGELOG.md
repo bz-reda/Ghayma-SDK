@@ -25,8 +25,10 @@ instead of a session.
 
 ### Fixed
 
-- `handleOAuthRedirect` removes the PKCE verifier from `sessionStorage` when
-  the exchange fails, not only when it succeeds.
+- `handleOAuthRedirect` clears the PKCE verifier and the spent `?code=`
+  whatever the exchange answers, not only when it succeeds, so running it
+  again on the callback page returns `false` instead of throwing
+  `invalid_grant`.
 
 ### Notes
 
@@ -34,6 +36,10 @@ instead of a session.
   factor. An app with 2FA should catch the error on its callback page (see
   the README): 1.2.0 read the fragment as a failed sign-in, and the PKCE and
   ID-token answers as a session without tokens.
+- `AuthError.code` now documents the two `signInWithIdToken` refusals over an
+  unverified email: `email_not_verified` (403, Google has not verified it)
+  and `account_email_unverified` (409, a password account with that email
+  has never verified it).
 
 ## 1.2.0
 

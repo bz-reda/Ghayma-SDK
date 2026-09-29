@@ -529,6 +529,8 @@ export class GhaymaAuth {
    * Finish a sign-in on your callback page, whichever way the provider came
    * back: a PKCE `?code=`, a provider `?error=`, or the implicit
    * `#access_token=` fragment. Returns true when a session was stored.
+   * A `?code=` gets one attempt: whatever the answer, it and its verifier are
+   * cleared, so running this again on the same page returns false.
    *
    * @throws {AuthError} 400 `oauth_error` — the provider refused
    * @throws {AuthError} 400 `invalid_grant` — no verifier for this redirect,
@@ -555,15 +557,14 @@ export class GhaymaAuth {
     try {
       await this.exchangeCodeForSession({ code, codeVerifier });
     } finally {
-      // Single use, whatever the answer
+      // Single use, whatever the answer: drop the verifier, and the spent
+      // code from the address bar, keeping the rest of the query
       globalThis.sessionStorage.removeItem(PKCE_STORAGE_KEY);
-    }
-
-    // Drop the spent code from the address bar, keeping the rest of the query
-    if (typeof globalThis.history !== "undefined") {
-      query.delete("code");
-      const search = query.toString();
-      globalThis.history.replaceState(null, "", globalThis.location.pathname + (search ? `?${search}` : ""));
+      if (typeof globalThis.history !== "undefined") {
+        query.delete("code");
+        const search = query.toString();
+        globalThis.history.replaceState(null, "", globalThis.location.pathname + (search ? `?${search}` : ""));
+      }
     }
 
     return true;

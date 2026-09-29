@@ -175,8 +175,8 @@ describe("handleOAuthFragment and a second factor", () => {
 });
 
 describe("handleOAuthRedirect and a second factor", () => {
-  test("pkce: a challenge rejects and the verifier is gone", async () => {
-    const store = fakeBrowser({ search: "?code=c1" });
+  test("pkce: a challenge rejects and leaves neither verifier nor code behind", async () => {
+    const store = fakeBrowser({ search: "?code=c1&next=%2Fhome" });
     store.set(PKCE_STORAGE_KEY, VERIFIER);
     const calls = stubFetch({ "/oauth/exchange": CHALLENGE });
     const { auth, events } = watched();
@@ -185,10 +185,15 @@ describe("handleOAuthRedirect and a second factor", () => {
 
     assert.deepEqual(calls[0].body, { code: "c1", code_verifier: VERIFIER });
     assert.equal(store.has(PKCE_STORAGE_KEY), false);
+    assert.equal(globalThis.history.url, "/cb?next=%2Fhome");
     assertNoSession(auth, events);
+
+    // A re-run (refresh, StrictMode) must not throw over the 2FA prompt
+    assert.equal(await auth.handleOAuthRedirect(), false);
+    assert.equal(calls.length, 1);
   });
 
-  test("pkce: a failed exchange drops the verifier too", async () => {
+  test("pkce: a failed exchange drops the verifier and the code too", async () => {
     const store = fakeBrowser({ search: "?code=c1" });
     store.set(PKCE_STORAGE_KEY, VERIFIER);
     stubFetch({ "/oauth/exchange": { status: 400, error: "invalid or expired code", code: "invalid_grant" } });
@@ -198,6 +203,7 @@ describe("handleOAuthRedirect and a second factor", () => {
       (err) => err instanceof AuthError && err.code === "invalid_grant"
     );
     assert.equal(store.has(PKCE_STORAGE_KEY), false);
+    assert.equal(globalThis.history.url, "/cb");
   });
 
   test("implicit: a challenge fragment rejects and is cleared", async () => {
