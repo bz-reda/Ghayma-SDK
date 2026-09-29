@@ -1,7 +1,7 @@
 import { HttpClient } from "./client.js";
 import { PKCE_STORAGE_KEY, generatePkce, pkceChallenge } from "./pkce.js";
 import { TokenManager } from "./token.js";
-import { AuthError } from "./types.js";
+import { AuthError, TwoFactorRequiredError } from "./types.js";
 import type {
   AuthConfig,
   AuthEvent,
@@ -31,7 +31,7 @@ import type {
   User,
 } from "./types.js";
 
-export { AuthError, PKCE_STORAGE_KEY, generatePkce, pkceChallenge };
+export { AuthError, PKCE_STORAGE_KEY, TwoFactorRequiredError, generatePkce, pkceChallenge };
 export type { PkcePair } from "./pkce.js";
 export type {
   AuthConfig,
@@ -91,6 +91,28 @@ function resolveServerKey(appSlug: string, explicit?: string): string | null {
   if (!env) return null;
 
   return env[`${SERVER_KEY_ENV}_${envSuffix(appSlug)}`] || env[SERVER_KEY_ENV] || null;
+}
+
+/**
+ * The pending second-factor step an implicit redirect carries in its
+ * fragment instead of tokens, or null. The fragment never holds a phone hint.
+ */
+function pendingSecondFactor(params: URLSearchParams): TwoFARequired | TwoFAEnrollmentRequired | null {
+  const methods = (params.get("methods") ?? "").split(",").filter(Boolean) as TwoFARequired["methods"];
+  if (params.get("two_fa_required") === "true") {
+    return { two_fa_required: true, challenge_token: params.get("challenge_token") ?? "", methods };
+  }
+  if (params.get("two_fa_enrollment_required") === "true") {
+    return { two_fa_enrollment_required: true, enroll_token: params.get("enroll_token") ?? "", methods };
+  }
+  return null;
+}
+
+/** Drop the fragment from the address bar, keeping the path and query. */
+function clearFragment(): void {
+  if (typeof globalThis.history !== "undefined") {
+    globalThis.history.replaceState(null, "", globalThis.location.pathname + globalThis.location.search);
+  }
 }
 
 export class GhaymaAuth {
@@ -425,16 +447,17 @@ export class GhaymaAuth {
    * @param options.clientIp — the end user's IP, forwarded so the service
    *   rate-limits per end user instead of per calling server. Needs a
    *   `serverKey`; without one it is ignored and nothing extra is sent.
+   * @throws {TwoFactorRequiredError} the app's 2FA policy applies — no
+   *   session was stored; finish with the token in `result`
    */
   async exchangeCodeForSession(params: ExchangeCodeParams, options?: RequestOptions): Promise<Session> {
-    const data = await this.http.post<Session>(
+    const data = await this.http.post<LoginResult>(
       "/oauth/exchange",
       { code: params.code, code_verifier: params.codeVerifier },
       false,
       options
     );
-    this.setSession(data, "SIGNED_IN");
-    return data;
+    return this.oauthSession(data);
   }
 
   /**
@@ -443,13 +466,14 @@ export class GhaymaAuth {
    * @param options.clientIp — the end user's IP, forwarded so the service
    *   rate-limits per end user instead of per calling server. Needs a
    *   `serverKey`; without one it is ignored and nothing extra is sent.
+   * @throws {TwoFactorRequiredError} the app's 2FA policy applies — no
+   *   session was stored; finish with the token in `result`
    */
   async signInWithIdToken(params: IdTokenParams, options?: RequestOptions): Promise<Session> {
     const body: Record<string, string> = { provider: params.provider, id_token: params.idToken };
     if (params.nonce) body.nonce = params.nonce;
-    const data = await this.http.post<Session>("/oauth/id-token", body, false, options);
-    this.setSession(data, "SIGNED_IN");
-    return data;
+    const data = await this.http.post<LoginResult>("/oauth/id-token", body, false, options);
+    return this.oauthSession(data);
   }
 
   /** Handle the OAuth callback by storing the tokens from the URL fragment */
@@ -469,12 +493,21 @@ export class GhaymaAuth {
    * Parse OAuth tokens from the current URL fragment.
    * Call this on your callback page: `auth.handleOAuthFragment()`
    * Returns true if tokens were found.
+   *
+   * @throws {TwoFactorRequiredError} the fragment carries a pending second
+   *   factor instead of tokens — it is cleared and no session is stored
    */
   handleOAuthFragment(): boolean {
     if (typeof globalThis.location === "undefined") return false;
 
     const hash = globalThis.location.hash.substring(1);
     const params = new URLSearchParams(hash);
+
+    const pending = pendingSecondFactor(params);
+    if (pending) {
+      clearFragment();
+      throw new TwoFactorRequiredError(pending);
+    }
 
     const accessToken = params.get("access_token");
     const refreshToken = params.get("refresh_token");
@@ -488,11 +521,7 @@ export class GhaymaAuth {
       expiresIn: parseInt(expiresIn, 10),
     });
 
-    // Clean up the URL fragment
-    if (typeof globalThis.history !== "undefined") {
-      globalThis.history.replaceState(null, "", globalThis.location.pathname + globalThis.location.search);
-    }
-
+    clearFragment();
     return true;
   }
 
@@ -504,6 +533,8 @@ export class GhaymaAuth {
    * @throws {AuthError} 400 `oauth_error` — the provider refused
    * @throws {AuthError} 400 `invalid_grant` — no verifier for this redirect,
    *   or a code the service has already spent
+   * @throws {TwoFactorRequiredError} the app's 2FA policy applies — no
+   *   session was stored; finish with the token in `result`
    */
   async handleOAuthRedirect(): Promise<boolean> {
     if (typeof globalThis.location === "undefined") return false;
@@ -521,8 +552,12 @@ export class GhaymaAuth {
       throw new AuthError("missing PKCE verifier for this redirect", 400, "invalid_grant");
     }
 
-    await this.exchangeCodeForSession({ code, codeVerifier });
-    globalThis.sessionStorage.removeItem(PKCE_STORAGE_KEY);
+    try {
+      await this.exchangeCodeForSession({ code, codeVerifier });
+    } finally {
+      // Single use, whatever the answer
+      globalThis.sessionStorage.removeItem(PKCE_STORAGE_KEY);
+    }
 
     // Drop the spent code from the address bar, keeping the rest of the query
     if (typeof globalThis.history !== "undefined") {
@@ -570,6 +605,15 @@ export class GhaymaAuth {
     this.tokens.setTokens(data);
     this.emit(event);
     this.scheduleRefresh();
+  }
+
+  /** An OAuth sign-in answers like login(); a pending second factor stores nothing. */
+  private oauthSession(data: LoginResult): Session {
+    if ("two_fa_required" in data || "two_fa_enrollment_required" in data) {
+      throw new TwoFactorRequiredError(data);
+    }
+    this.setSession(data, "SIGNED_IN");
+    return data;
   }
 
   private clearSession(): void {
