@@ -182,7 +182,7 @@ export async function finishOAuthSignIn(auth: GhaymaAuth, askUserForCode: () => 
   try {
     await auth.handleOAuthRedirect();
   } catch (e) {
-    if (e instanceof TwoFactorRequiredError && "challenge_token" in e.result) {
+    if (e instanceof TwoFactorRequiredError && "two_fa_required" in e.result) {
       const code = await askUserForCode();
       await auth.verify2FA({ challenge_token: e.result.challenge_token, code });
     }
