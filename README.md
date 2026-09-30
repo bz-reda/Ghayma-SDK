@@ -73,6 +73,24 @@ A mobile deep link (`com.example.app://callback`) works the same way, as long as
 
 The full walkthrough is in [OAuth on mobile](https://docs.ghayma.cloud/guides/oauth-mobile).
 
+### Second factor on OAuth sign-in
+
+When the app's 2FA policy applies to the user, an OAuth sign-in stores no session: `handleOAuthRedirect`, `handleOAuthFragment`, `exchangeCodeForSession` and `signInWithIdToken` throw a `TwoFactorRequiredError` whose `result` is the pending step `login()` would have returned.
+
+```ts
+import { TwoFactorRequiredError } from "@ghayma/sdk/client";
+
+try { await auth.handleOAuthRedirect(); }
+catch (e) {
+  if (e instanceof TwoFactorRequiredError && "two_fa_required" in e.result) {
+    const code = await askUserForCode();
+    await auth.verify2FA({ challenge_token: e.result.challenge_token, code });
+  }
+}
+```
+
+A `two_fa_enrollment_required` result means the app enforces 2FA and the user has no factor yet: pass `e.result.enroll_token` to `enrollTotp`, then to `confirmTotp` with the first code, which completes the sign-in.
+
 ## What each entry can do
 
 **`@ghayma/sdk` (server)**

@@ -17,6 +17,8 @@ import type {
   Database,
   DatabaseMetrics,
 } from "../src/index.js";
+import { AuthError, TwoFactorRequiredError } from "../src/client/index.js";
+import type { GhaymaAuth, TwoFAEnrollmentRequired, TwoFARequired } from "../src/client/index.js";
 
 /** paas-api internal/authapps/models.go — AuthApp */
 export const authApp: AuthApp = {
@@ -154,3 +156,35 @@ export const bucketCredentials: BucketCredentials = {
   endpoint: "https://s3.ghayma.tech",
   region: "garage",
 };
+
+/** paas-api api/openapi/auth.v1.yaml — TwoFARequired (POST /login, /oauth/exchange, /oauth/id-token) */
+export const twoFARequired: TwoFARequired = {
+  two_fa_required: true,
+  challenge_token: "4c1d8ab2e3f5",
+  methods: ["totp"],
+  phone_hint: "",
+};
+
+/** paas-api api/openapi/auth.v1.yaml — TwoFAEnrollmentRequired */
+export const twoFAEnrollmentRequired: TwoFAEnrollmentRequired = {
+  two_fa_enrollment_required: true,
+  enroll_token: "7b2e9c40a1d6",
+  methods: ["totp"],
+};
+
+// The OAuth sign-in methods throw a pending step as a TwoFactorRequiredError.
+export const twoFactorRequired: AuthError = new TwoFactorRequiredError(twoFARequired);
+export const pendingStep: TwoFARequired | TwoFAEnrollmentRequired =
+  new TwoFactorRequiredError(twoFAEnrollmentRequired).result;
+
+/** The README's callback-page pattern must compile. */
+export async function finishOAuthSignIn(auth: GhaymaAuth, askUserForCode: () => Promise<string>) {
+  try {
+    await auth.handleOAuthRedirect();
+  } catch (e) {
+    if (e instanceof TwoFactorRequiredError && "two_fa_required" in e.result) {
+      const code = await askUserForCode();
+      await auth.verify2FA({ challenge_token: e.result.challenge_token, code });
+    }
+  }
+}

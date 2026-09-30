@@ -192,8 +192,11 @@ export class AuthError extends Error {
   /**
    * The service's error code — `invalid_credentials`, `rate_limited`,
    * `invalid_request`, `invalid_grant` (expired or replayed one-time code),
-   * `invalid_token` (rejected provider ID token) — or `oauth_error` for a
-   * provider error handed back on the redirect. Defaults to `auth_error`.
+   * `invalid_token` (rejected provider ID token), `email_not_verified` (403
+   * on `signInWithIdToken`: Google has not verified the email) — or
+   * `oauth_error` for a provider error handed back on the redirect.
+   * Defaults to `auth_error`. A `TwoFactorRequiredError` carries
+   * `two_fa_required` or `two_fa_enrollment_required`.
    */
   public readonly code: string;
   /**
@@ -209,5 +212,25 @@ export class AuthError extends Error {
     this.status = status;
     this.code = code ?? "auth_error";
     this.retryAfter = retryAfter;
+  }
+}
+
+/**
+ * Thrown by the OAuth sign-in methods when the app's 2FA policy applies to
+ * the user: no session was created. Finish with `verify2FA` (a
+ * `two_fa_required` result) or with `enrollTotp` + `confirmTotp` (a
+ * `two_fa_enrollment_required` result), passing the token in `result`.
+ */
+export class TwoFactorRequiredError extends AuthError {
+  public readonly result: TwoFARequired | TwoFAEnrollmentRequired;
+  constructor(result: TwoFARequired | TwoFAEnrollmentRequired) {
+    const enrol = "two_fa_enrollment_required" in result;
+    super(
+      enrol ? "two-factor enrolment required" : "two-factor code required",
+      200,
+      enrol ? "two_fa_enrollment_required" : "two_fa_required"
+    );
+    this.name = "TwoFactorRequiredError";
+    this.result = result;
   }
 }

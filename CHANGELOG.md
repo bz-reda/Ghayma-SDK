@@ -2,6 +2,43 @@
 
 Releases before 0.6.0 are documented in the git history.
 
+## 1.3.0
+
+The auth service now asks the app's second factor on OAuth sign-in too, as
+`POST /login` always has. The client entry surfaces that step as an error
+instead of a session.
+
+### Added
+
+- **`TwoFactorRequiredError`** — an `AuthError` whose `code` is
+  `two_fa_required` or `two_fa_enrollment_required` and whose `result` holds
+  the pending step, the shape `login()` resolves to. Finish with `verify2FA`,
+  or with `enrollTotp` + `confirmTotp`.
+
+### Changed
+
+- **`exchangeCodeForSession`**, **`signInWithIdToken`**,
+  **`handleOAuthFragment`** and **`handleOAuthRedirect`** throw
+  `TwoFactorRequiredError` when the app's 2FA policy applies to the user. No
+  session is stored and no `SIGNED_IN` fires; a fragment carrying the step is
+  cleared from the address bar all the same.
+
+### Fixed
+
+- `handleOAuthRedirect` clears the PKCE verifier and the spent `?code=`
+  whatever the exchange answers, not only when it succeeds, so running it
+  again on the callback page returns `false` instead of throwing
+  `invalid_grant`.
+
+### Notes
+
+- Signatures are unchanged, and nothing changes for users without a second
+  factor. An app with 2FA should catch the error on its callback page (see
+  the README): 1.2.0 read the fragment as a failed sign-in, and the PKCE and
+  ID-token answers as a session without tokens.
+- `AuthError.code` now documents `email_not_verified`, the 403
+  `signInWithIdToken` answers when Google has not verified the email.
+
 ## 1.2.0
 
 The client entry gains the mobile OAuth flows the auth service already
