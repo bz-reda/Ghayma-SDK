@@ -193,12 +193,10 @@ export class AuthError extends Error {
    * The service's error code — `invalid_credentials`, `rate_limited`,
    * `invalid_request`, `invalid_grant` (expired or replayed one-time code),
    * `invalid_token` (rejected provider ID token), `email_not_verified` (403
-   * on `signInWithIdToken`: Google has not verified the email),
-   * `account_email_unverified` (409 on `signInWithIdToken`: a password
-   * account with that email has never verified it; verify it or reset the
-   * password first) — or `oauth_error` for a provider error handed back on
-   * the redirect. Defaults to `auth_error`. A `TwoFactorRequiredError`
-   * carries `two_fa_required` or `two_fa_enrollment_required`.
+   * on `signInWithIdToken`: Google has not verified the email) — or
+   * `oauth_error` for a provider error handed back on the redirect.
+   * Defaults to `auth_error`. A `TwoFactorRequiredError` carries
+   * `two_fa_required` or `two_fa_enrollment_required`.
    */
   public readonly code: string;
   /**

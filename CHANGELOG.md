@@ -36,10 +36,8 @@ instead of a session.
   factor. An app with 2FA should catch the error on its callback page (see
   the README): 1.2.0 read the fragment as a failed sign-in, and the PKCE and
   ID-token answers as a session without tokens.
-- `AuthError.code` now documents the two `signInWithIdToken` refusals over an
-  unverified email: `email_not_verified` (403, Google has not verified it)
-  and `account_email_unverified` (409, a password account with that email
-  has never verified it).
+- `AuthError.code` now documents `email_not_verified`, the 403
+  `signInWithIdToken` answers when Google has not verified the email.
 
 ## 1.2.0
 
