@@ -383,6 +383,8 @@ const auth = new GhaymaAuth({
 });
 ```
 
+With `localStorage`, every tab of your site shares one session, and the tabs take turns refreshing it (through Web Locks where the browser has them), so a refresh token is never presented twice: the auth service treats a reused refresh token as stolen and ends every session of the user.
+
 ### Server-side calls to the auth service
 
 When your own server calls the auth service, every request arrives from one IP and all of your users share a single rate-limit bucket. A **server key** (`ghs_…`) lets the service trust an end-user IP your server forwards and charge the limit to that address instead. Ghayma injects the key into connected apps, so the client picks it up on its own; pass `serverKey` explicitly only when hosting elsewhere.
