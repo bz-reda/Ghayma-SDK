@@ -2,6 +2,45 @@
 
 Releases before 0.6.0 are documented in the git history.
 
+## 1.4.0
+
+Tabs that share a session no longer sign the user out everywhere. The auth
+service rotates refresh tokens, and a rotated one presented again ends every
+session of the user. Two tabs refreshing the same stored session did exactly
+that, intermittently, since every tab timed its refresh for the same moment
+and background tabs run their timers late.
+
+### Fixed
+
+- **`refreshToken()`** sends one request at a time per client. Concurrent
+  calls share it, including the refreshes `getUser()` and the other
+  authenticated methods start for an expired token.
+- With `storage: "localStorage"`, tabs take turns refreshing, and each one
+  re-reads the stored session first. A tab that finds a pair another tab
+  already rotated in takes it over instead of spending the old token; one
+  that finds the session gone signs out (`SIGNED_OUT`) without a request.
+  The turns use Web Locks (`navigator.locks`), or, where a browser has none
+  (an insecure context, an old browser), a lease in localStorage that the
+  waiting tabs watch through `storage` events.
+- **`logout()`** revokes the newest refresh token, which another tab may
+  have rotated in, rather than this tab's older copy.
+- A pair that cannot be written to localStorage (quota exceeded) no longer
+  leaves the spent one there for another tab to present.
+- `storage: "localStorage"` on Node 26+ started without
+  `--localstorage-file` no longer throws from the constructor; the session
+  is kept in memory.
+
+### Notes
+
+- No API changes. Taking over another tab's pair emits `TOKEN_REFRESHED`,
+  as a refresh would; finding the session gone rejects with "No refresh
+  token available", as calling `refreshToken()` without a session does.
+- Memory sessions (the default, and the only kind on servers and React
+  Native) take no lock and read no storage.
+- A tab still running an older build takes no part until it reloads.
+- `@ghayma/auth` 0.8.0 depends on `@ghayma/sdk` `^1.1.0`, so a fresh install
+  or a lockfile update resolves this release; the alias needs no release.
+
 ## 1.3.0
 
 The auth service now asks the app's second factor on OAuth sign-in too, as

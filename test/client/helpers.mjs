@@ -96,4 +96,76 @@ export function clearBrowser() {
   delete globalThis.history;
 }
 
+// Tabs of one origin share localStorage and Web Locks. A test simulates them
+// with several clients over one fake store in this one process. Newer Node
+// releases define some of these globals themselves, so they are saved here
+// and put back by clearTabs.
+
+const TAB_GLOBALS = ["localStorage", "navigator", "addEventListener", "removeEventListener"];
+const originalGlobals = new Map(
+  TAB_GLOBALS.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)])
+);
+
+function setGlobal(name, value) {
+  Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+}
+
+/**
+ * Install a localStorage shared by every client, delivering `storage` events
+ * the way a browser does to the other tabs. Setting `failWrites` makes
+ * setItem throw, like a full quota.
+ */
+export function sharedStorage() {
+  const map = new Map();
+  const listeners = new Set();
+  const notify = (key) => setTimeout(() => listeners.forEach((listener) => listener({ key })));
+  const storage = {
+    failWrites: false,
+    getItem: (key) => (map.has(key) ? map.get(key) : null),
+    setItem(key, value) {
+      if (storage.failWrites) throw new DOMException("quota exceeded", "QuotaExceededError");
+      map.set(key, String(value));
+      notify(key);
+    },
+    removeItem(key) {
+      map.delete(key);
+      notify(key);
+    },
+  };
+  setGlobal("localStorage", storage);
+  setGlobal("addEventListener", (type, listener) => type === "storage" && listeners.add(listener));
+  setGlobal("removeEventListener", (type, listener) => type === "storage" && listeners.delete(listener));
+  return storage;
+}
+
+/** Replace `navigator`; `{}` is a browser without Web Locks. */
+export function setNavigator(value) {
+  setGlobal("navigator", value);
+}
+
+/** Install a Web Locks stand-in granting each name in turn; returns the names requested. */
+export function webLocks() {
+  const names = [];
+  const tails = new Map();
+  setNavigator({
+    locks: {
+      request(name, callback) {
+        names.push(name);
+        const granted = (tails.get(name) ?? Promise.resolve()).then(() => callback({ name, mode: "exclusive" }));
+        tails.set(name, granted.catch(() => {}));
+        return granted;
+      },
+    },
+  });
+  return names;
+}
+
+/** Put back the globals sharedStorage, setNavigator and webLocks replaced. */
+export function clearTabs() {
+  for (const [name, descriptor] of originalGlobals) {
+    if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+    else delete globalThis[name];
+  }
+}
+
 export { BASE_URL, APP_SLUG };
