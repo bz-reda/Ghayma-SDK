@@ -6,14 +6,18 @@ import { APP_SLUG, BASE_URL, sessionResponse, stubFetch } from "./helpers.mjs";
 
 const KEY = `ghs_${"a".repeat(48)}`;
 const OTHER_KEY = `ghs_${"b".repeat(48)}`;
-const SCOPED_ENV = `ESPACETECH_AUTH_SERVER_KEY_${APP_SLUG.toUpperCase()}`;
-const BARE_ENV = "ESPACETECH_AUTH_SERVER_KEY";
+const SCOPED_ENV = `GHAYMA_AUTH_SERVER_KEY_${APP_SLUG.toUpperCase()}`;
+const BARE_ENV = "GHAYMA_AUTH_SERVER_KEY";
+// The names injected before the Ghayma ones, still read as a fallback
+const LEGACY_SCOPED_ENV = `ESPACETECH_AUTH_SERVER_KEY_${APP_SLUG.toUpperCase()}`;
+const LEGACY_BARE_ENV = "ESPACETECH_AUTH_SERVER_KEY";
+const ALL_ENV = [SCOPED_ENV, BARE_ENV, LEGACY_SCOPED_ENV, LEGACY_BARE_ENV];
 const EMAIL = "user@test.local";
 
 /** Env and the simulated browser global leak between tests otherwise. */
 function reset() {
   for (const name of Object.keys(process.env)) {
-    if (name.startsWith(BARE_ENV)) delete process.env[name];
+    if (name.startsWith(BARE_ENV) || name.startsWith(LEGACY_BARE_ENV)) delete process.env[name];
   }
   delete globalThis.window;
 }
@@ -45,13 +49,12 @@ const serverKeyHeader = (headers) => headers["X-Ghayma-Server-Key"];
 const clientIpHeader = (headers) => headers["X-Ghayma-Client-IP"];
 
 // ==================== Server key resolution ====================
-// Ghayma injects the key into hosted pods as ESPACETECH_AUTH_SERVER_KEY_<SLUG>,
-// plus the bare name when the project has exactly one auth app.
+// Ghayma injects the key into hosted pods as GHAYMA_AUTH_SERVER_KEY_<SLUG>,
+// plus the bare name for the oldest auth app connected to the site.
 
 describe("server key resolution (Node)", () => {
-  test("explicit option wins over both env vars", async () => {
-    process.env[SCOPED_ENV] = OTHER_KEY;
-    process.env[BARE_ENV] = OTHER_KEY;
+  test("explicit option wins over every env var", async () => {
+    for (const name of ALL_ENV) process.env[name] = OTHER_KEY;
 
     const headers = await registerHeaders({ serverKey: KEY }, { clientIp: "1.2.3.4" });
 
@@ -93,7 +96,7 @@ describe("server key resolution (Node)", () => {
   });
 
   test("non-alphanumeric slug characters become underscores", async () => {
-    process.env["ESPACETECH_AUTH_SERVER_KEY_MY_APP_2"] = KEY;
+    process.env["GHAYMA_AUTH_SERVER_KEY_MY_APP_2"] = KEY;
 
     const headers = await registerHeaders({ appSlug: "my-app.2" }, { clientIp: "1.2.3.4" });
 
@@ -105,6 +108,53 @@ describe("server key resolution (Node)", () => {
 
     assert.equal(serverKeyHeader(headers), undefined);
     assert.equal(clientIpHeader(headers), undefined);
+  });
+});
+
+// ==================== Legacy names ====================
+// Apps deployed before the Ghayma names carry only the ESPACETECH_ ones. They
+// are read after both Ghayma names, under the same per-slug rule.
+
+describe("legacy server key names", () => {
+  test("resolves Ghayma scoped, Ghayma bare, legacy scoped, then legacy bare", async () => {
+    const keyOf = (i) => `ghs_${String(i).repeat(48)}`;
+    ALL_ENV.forEach((name, i) => {
+      process.env[name] = keyOf(i);
+    });
+
+    // Removing each winner in turn exposes the next name in line
+    for (const [i, name] of ALL_ENV.entries()) {
+      const headers = await registerHeaders({}, { clientIp: "1.2.3.4" });
+      assert.equal(serverKeyHeader(headers), keyOf(i), `${name} should win`);
+      delete process.env[name];
+    }
+  });
+
+  test("an app with only the legacy names keeps its key", async () => {
+    process.env[LEGACY_SCOPED_ENV] = KEY;
+    process.env[LEGACY_BARE_ENV] = OTHER_KEY;
+
+    const headers = await registerHeaders({}, { clientIp: "1.2.3.4" });
+
+    assert.equal(serverKeyHeader(headers), KEY);
+  });
+
+  test("empty Ghayma vars do not hide the legacy ones", async () => {
+    process.env[SCOPED_ENV] = "";
+    process.env[BARE_ENV] = "";
+    process.env[LEGACY_BARE_ENV] = KEY;
+
+    const headers = await registerHeaders({}, { clientIp: "1.2.3.4" });
+
+    assert.equal(serverKeyHeader(headers), KEY);
+  });
+
+  test("legacy names follow the same per-slug rule", async () => {
+    process.env["ESPACETECH_AUTH_SERVER_KEY_MY_APP_2"] = KEY;
+
+    const headers = await registerHeaders({ appSlug: "my-app.2" }, { clientIp: "1.2.3.4" });
+
+    assert.equal(serverKeyHeader(headers), KEY);
   });
 });
 
@@ -123,8 +173,7 @@ describe("browser guard", () => {
   });
 
   test("a browser never reads the key out of the environment", async () => {
-    process.env[SCOPED_ENV] = KEY;
-    process.env[BARE_ENV] = KEY;
+    for (const name of ALL_ENV) process.env[name] = KEY;
     globalThis.window = {};
 
     const headers = await registerHeaders({}, { clientIp: "1.2.3.4" });

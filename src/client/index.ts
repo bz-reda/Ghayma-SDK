@@ -63,7 +63,10 @@ export type {
 };
 
 const DEFAULT_BASE_URL = "https://auth.ghayma.tech";
-const SERVER_KEY_ENV = "ESPACETECH_AUTH_SERVER_KEY";
+const SERVER_KEY_ENV = "GHAYMA_AUTH_SERVER_KEY";
+// The name before the rebrand, still injected into existing apps. Silent
+// fallback: customer-facing text names only the Ghayma one.
+const LEGACY_SERVER_KEY_ENV = "ESPACETECH_AUTH_SERVER_KEY";
 
 /** `my-app.2` → `MY_APP_2` — the suffix Ghayma injects server keys under. */
 function envSuffix(appSlug: string): string {
@@ -71,9 +74,10 @@ function envSuffix(appSlug: string): string {
 }
 
 /**
- * Explicit option → `ESPACETECH_AUTH_SERVER_KEY_<SLUG>` → bare
- * `ESPACETECH_AUTH_SERVER_KEY`. Browsers get no key at all: env is never
- * read there, and an explicit one is a bug worth failing loudly on.
+ * Explicit option → `GHAYMA_AUTH_SERVER_KEY_<SLUG>` → bare
+ * `GHAYMA_AUTH_SERVER_KEY` → the same two under the legacy prefix. An empty
+ * value counts as unset. Browsers get no key at all: env is never read
+ * there, and an explicit one is a bug worth failing loudly on.
  */
 function resolveServerKey(appSlug: string, explicit?: string): string | null {
   if (typeof window !== "undefined") {
@@ -90,7 +94,14 @@ function resolveServerKey(appSlug: string, explicit?: string): string | null {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
   if (!env) return null;
 
-  return env[`${SERVER_KEY_ENV}_${envSuffix(appSlug)}`] || env[SERVER_KEY_ENV] || null;
+  const suffix = envSuffix(appSlug);
+  return (
+    env[`${SERVER_KEY_ENV}_${suffix}`] ||
+    env[SERVER_KEY_ENV] ||
+    env[`${LEGACY_SERVER_KEY_ENV}_${suffix}`] ||
+    env[LEGACY_SERVER_KEY_ENV] ||
+    null
+  );
 }
 
 /**

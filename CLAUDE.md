@@ -73,5 +73,7 @@ src/
 - Retries use exponential backoff with jitter, only on 5xx or network errors.
 - `rawFetch` is used for streaming responses (file downloads) — separate from the JSON `request` method.
 - Environment variable `GHAYMA_API_URL` overrides the default base URL (for internal cluster routing) — an explicitly-passed `baseUrl` always wins; the legacy `ESPACE_API_URL` is still read as a fallback.
+- The client entry resolves its server key as: explicit `serverKey` → `GHAYMA_AUTH_SERVER_KEY_<SLUG>` → `GHAYMA_AUTH_SERVER_KEY` → legacy `ESPACETECH_AUTH_SERVER_KEY_<SLUG>` → `ESPACETECH_AUTH_SERVER_KEY`, and never in a browser. An empty variable counts as unset.
+- Legacy `ESPACE*` env names are silent fallbacks: keep them in code and tests, never in the README, public JSDoc, error messages or CHANGELOG. The storage key `espace_auth_session` and lock name `espace_auth_session:lock` are never renamed — that would sign every user out.
 - The server entry targets Node and edge runtimes; the client entry targets browsers (and servers holding a `serverKey`). Both use `globalThis` and guard `process.env` access.
 - Publishing is the operator's step (`npm publish`, 2FA). After a release that changes the client entry, the `@ghayma/auth` alias package (Ghayma-Auth-SDK) re-exports `@ghayma/sdk/client` and follows.

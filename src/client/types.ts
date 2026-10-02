@@ -18,9 +18,11 @@ export interface AuthConfig {
    * spoof the address a rate limit is charged to.
    *
    * On Ghayma-hosted apps the key is injected into the pod as
-   * `ESPACETECH_AUTH_SERVER_KEY_<SLUG>` (and as `ESPACETECH_AUTH_SERVER_KEY`
-   * when the project has exactly one auth app) and picked up automatically,
-   * so you rarely need to set this by hand.
+   * `GHAYMA_AUTH_SERVER_KEY_<SLUG>` (the slug uppercased, every other
+   * character turned into `_`), and as `GHAYMA_AUTH_SERVER_KEY` for the
+   * oldest auth app connected to the site. When this option is unset the
+   * client reads the slug-scoped name, then the bare one, so you rarely
+   * need to set it by hand.
    */
   serverKey?: string;
 }
