@@ -2,6 +2,29 @@
 
 Releases before 0.6.0 are documented in the git history.
 
+## 1.5.0
+
+The client entry reads the auth server key under its Ghayma names.
+
+### Added
+
+- **`GHAYMA_AUTH_SERVER_KEY_<SLUG>`** and **`GHAYMA_AUTH_SERVER_KEY`** — with
+  no `serverKey` option, a `GhaymaAuth` built in server code reads the
+  slug-scoped name, then the bare one. `<SLUG>` is the app slug uppercased,
+  every other character turned into `_` (`my-app` → `MY_APP`). Ghayma injects
+  both into connected apps; the bare one holds the key of the oldest auth app
+  connected to the site.
+
+### Notes
+
+- The variable names used before are still read, after the Ghayma ones, so
+  an app deployed before Ghayma injected the new names keeps its key without
+  a change. The same goes for `GHAYMA_API_URL` on the server entry.
+- An empty variable counts as unset, so it never hides the one after it.
+- Browsers still never read a key from the environment. No API changes.
+- `@ghayma/auth` depends on `@ghayma/sdk` `^1.1.0`, so a fresh install or a
+  lockfile update resolves this release.
+
 ## 1.4.0
 
 Tabs that share a session no longer sign the user out everywhere. The auth

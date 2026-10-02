@@ -387,7 +387,7 @@ With `localStorage`, every tab of your site shares one session, and the tabs tak
 
 ### Server-side calls to the auth service
 
-When your own server calls the auth service, every request arrives from one IP and all of your users share a single rate-limit bucket. A **server key** (`ghs_…`) lets the service trust an end-user IP your server forwards and charge the limit to that address instead. Ghayma injects the key into connected apps, so the client picks it up on its own; pass `serverKey` explicitly only when hosting elsewhere.
+When your own server calls the auth service, every request arrives from one IP and all of your users share a single rate-limit bucket. A **server key** (`ghs_…`) lets the service trust an end-user IP your server forwards and charge the limit to that address instead. Ghayma injects the key into connected apps as `GHAYMA_AUTH_SERVER_KEY_<SLUG>` (see [Environment variables](#environment-variables)), so the client picks it up on its own; pass `serverKey` explicitly only when hosting elsewhere.
 
 ```ts
 // app/api/register/route.ts — a client per request, never module-level
@@ -417,7 +417,10 @@ import { GhaymaAuth } from "@ghayma/sdk/client";
 |---|---|---|
 | `GHAYMA_API_KEY` | server entry | The project API key. Set it in your site's environment variables today; automatic injection arrives with Connections |
 | `GHAYMA_API_URL` | server entry | Base URL override (an explicit `baseUrl` still wins) |
-| `ESPACETECH_AUTH_SERVER_KEY_<SLUG>` | client entry, server-side only | The auth app's server key, injected into connected apps |
+| `GHAYMA_AUTH_SERVER_KEY_<SLUG>` | client entry, server-side only | The auth app's server key, injected into connected apps. `<SLUG>` is the app slug uppercased, every other character turned into `_` (`my-app` → `MY_APP`) |
+| `GHAYMA_AUTH_SERVER_KEY` | client entry, server-side only | The server key of the oldest auth app connected to the site, read when the slug-scoped one is unset |
+
+An explicit `serverKey` wins over both server key variables, and a browser never reads either.
 
 ## Next.js
 
