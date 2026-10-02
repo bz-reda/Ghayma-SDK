@@ -120,6 +120,7 @@ export class GhaymaAuth {
   private tokens: TokenManager;
   private listeners: Set<AuthStateListener> = new Set();
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private refreshing: Promise<TokenPair> | null = null;
   private autoRefresh: boolean;
   private appSlug: string;
   private baseUrl: string;
@@ -238,37 +239,32 @@ export class GhaymaAuth {
 
   /** Log out and revoke the refresh token */
   async logout(): Promise<void> {
-    const refreshToken = this.tokens.getRefreshToken();
-    if (refreshToken) {
-      try {
-        await this.http.post("/logout", { refresh_token: refreshToken });
-      } catch {
-        // Best effort — clear local state regardless
+    await this.tokens.exclusive(async () => {
+      // Revoke the newest token, which another tab may have rotated in
+      this.tokens.sync();
+      const refreshToken = this.tokens.getRefreshToken();
+      if (refreshToken) {
+        try {
+          await this.http.post("/logout", { refresh_token: refreshToken });
+        } catch {
+          // Best effort — clear local state regardless
+        }
       }
-    }
-    this.clearSession();
+      this.clearSession();
+    });
   }
 
-  /** Refresh the access token using the stored refresh token */
+  /**
+   * Refresh the access token using the stored refresh token. Concurrent calls
+   * share one request, and tabs sharing localStorage take turns: a tab that
+   * finds the token already rotated by another takes that pair over. A spent
+   * token presented again makes the service end every session of the user.
+   */
   async refreshToken(): Promise<TokenPair> {
-    const refreshToken = this.tokens.getRefreshToken();
-    if (!refreshToken) {
-      this.clearSession();
-      throw new Error("No refresh token available");
-    }
-
-    try {
-      const data = await this.http.post<TokenPair>("/refresh", {
-        refresh_token: refreshToken,
-      });
-      this.tokens.setTokens(data);
-      this.emit("TOKEN_REFRESHED");
-      this.scheduleRefresh();
-      return data;
-    } catch (err) {
-      this.clearSession();
-      throw err;
-    }
+    this.refreshing ??= this.tokens.exclusive(() => this.rotate()).finally(() => {
+      this.refreshing = null;
+    });
+    return this.refreshing;
   }
 
   /**
@@ -608,6 +604,33 @@ export class GhaymaAuth {
     this.scheduleRefresh();
   }
 
+  /** Spend the refresh token, unless another tab already rotated in a pair that is still valid. */
+  private async rotate(): Promise<TokenPair> {
+    if (this.tokens.sync() && this.tokens.hasSession() && !this.tokens.isExpired()) {
+      this.emit("TOKEN_REFRESHED");
+      this.scheduleRefresh();
+      return this.tokens.getTokenPair()!;
+    }
+
+    // None when another tab signed out meanwhile
+    const refreshToken = this.tokens.getRefreshToken();
+    if (!refreshToken) {
+      this.clearSession();
+      throw new Error("No refresh token available");
+    }
+
+    try {
+      const data = await this.http.post<TokenPair>("/refresh", {
+        refresh_token: refreshToken,
+      });
+      this.setSession(data, "TOKEN_REFRESHED");
+      return data;
+    } catch (err) {
+      this.clearSession();
+      throw err;
+    }
+  }
+
   /** An OAuth sign-in answers like login(); a pending second factor stores nothing. */
   private oauthSession(data: LoginResult): Session {
     if ("two_fa_required" in data || "two_fa_enrollment_required" in data) {
@@ -627,15 +650,9 @@ export class GhaymaAuth {
   }
 
   private emit(event: AuthEvent): void {
-    const session: Session | null = this.tokens.hasSession()
-      ? ({
-          access_token: this.tokens.getAccessToken()!,
-          refresh_token: this.tokens.getRefreshToken()!,
-          expires_in: Math.floor(this.tokens.expiresIn() / 1000),
-          token_type: "Bearer",
-          user: {} as User, // user not always available in events
-        } as Session)
-      : null;
+    const pair = this.tokens.getTokenPair();
+    // user not always available in events
+    const session: Session | null = pair ? { ...pair, user: {} as User } : null;
 
     for (const listener of this.listeners) {
       try {
