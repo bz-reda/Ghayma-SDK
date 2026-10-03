@@ -77,7 +77,8 @@ export class HttpClient {
     this.credential = credential;
     // Dual-read: prefer GHAYMA_API_URL, fall back to legacy ESPACE_API_URL
     // so existing deployments setting the old var keep working post-rebrand.
-    const envUrl = readEnv("GHAYMA_API_URL") ?? readEnv("ESPACE_API_URL");
+    // An empty value counts as unset, as for the auth server key.
+    const envUrl = readEnv("GHAYMA_API_URL") || readEnv("ESPACE_API_URL");
     this.baseUrl = (config.baseUrl || envUrl || "https://api.ghayma.tech").replace(/\/$/, "");
     this.timeout = config.timeout ?? 30_000;
     this.maxRetries = config.maxRetries ?? 2;

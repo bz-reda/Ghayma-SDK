@@ -177,3 +177,50 @@ test("an account token still works but warns once", async () => {
     console.warn = orig;
   }
 });
+
+// ── Base URL ───────────────────────────────────────────────────
+
+const INTERNAL = "https://api.internal.test";
+const LEGACY = "https://legacy.internal.test";
+
+/** Origin a client sends to with `env` set; ESPACE_API_URL is the legacy name. */
+async function requestOrigin(env, config = {}) {
+  const names = ["GHAYMA_API_URL", "ESPACE_API_URL"];
+  for (const name of names) delete process.env[name];
+  Object.assign(process.env, env);
+  try {
+    const calls = stubFetch({ buckets: [] });
+    await new Ghayma({ apiKey: "gsk_test", maxRetries: 0, ...config }).storage.listBuckets();
+    return calls[0].url.origin;
+  } finally {
+    for (const name of names) delete process.env[name];
+  }
+}
+
+test("without a base URL variable the default is used", async () => {
+  assert.equal(await requestOrigin({}), "https://api.ghayma.tech");
+});
+
+test("GHAYMA_API_URL overrides the default base URL", async () => {
+  assert.equal(await requestOrigin({ GHAYMA_API_URL: INTERNAL }), INTERNAL);
+});
+
+test("GHAYMA_API_URL beats the legacy variable", async () => {
+  assert.equal(await requestOrigin({ GHAYMA_API_URL: INTERNAL, ESPACE_API_URL: LEGACY }), INTERNAL);
+});
+
+test("the legacy variable is still read as a fallback", async () => {
+  assert.equal(await requestOrigin({ ESPACE_API_URL: LEGACY }), LEGACY);
+});
+
+test("an empty GHAYMA_API_URL does not hide the legacy variable", async () => {
+  assert.equal(await requestOrigin({ GHAYMA_API_URL: "", ESPACE_API_URL: LEGACY }), LEGACY);
+});
+
+test("an explicit baseUrl beats both variables", async () => {
+  const origin = await requestOrigin(
+    { GHAYMA_API_URL: INTERNAL, ESPACE_API_URL: LEGACY },
+    { baseUrl: "https://explicit.test" }
+  );
+  assert.equal(origin, "https://explicit.test");
+});
