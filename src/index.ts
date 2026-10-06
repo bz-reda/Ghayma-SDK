@@ -69,6 +69,9 @@ export { GhaymaError } from "./http.js";
 export { EspaceError } from "./http.js";
 export type { ClientConfig } from "./http.js";
 
+export { getClientIp } from "./client-ip.js";
+export type { ClientIpSource } from "./client-ip.js";
+
 export { StorageClient } from "./storage/index.js";
 export type {
   Bucket,

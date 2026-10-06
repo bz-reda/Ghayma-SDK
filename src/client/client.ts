@@ -1,14 +1,10 @@
+import { IP_LITERAL } from "../client-ip.js";
 import { AuthError } from "./types.js";
 import type { RequestOptions } from "./types.js";
 import { TokenManager } from "./token.js";
 
 const SERVER_KEY_HEADER = "X-Ghayma-Server-Key";
 const CLIENT_IP_HEADER = "X-Ghayma-Client-IP";
-
-// Shape guard, not a full validator: the characters an IPv4/IPv6 literal can
-// use, plus an optional zone id. Enough to drop a comma-joined
-// `x-forwarded-for` chain, "unknown", or anything carrying control characters.
-const IP_LITERAL = /^[0-9a-fA-F.:]+(%[0-9a-zA-Z._-]+)?$/;
 
 /**
  * `Retry-After` is either a delay in seconds or an HTTP-date; both are

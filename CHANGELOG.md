@@ -2,6 +2,35 @@
 
 Releases before 0.6.0 are documented in the git history.
 
+## 1.6.0
+
+Server code can read the visitor's IP in one call, and `verify2FA` and
+`refreshToken` now accept it as `clientIp`.
+
+### Added
+
+- **`getClientIp(request)`** — reads the visitor's IP that Ghayma's edge
+  writes into `X-Real-IP`; never `X-Forwarded-For`. It takes a Fetch
+  `Request`, a `Headers` or a Node request, is exported by both entries,
+  and returns `undefined` unless the header holds one valid IPv4 or IPv6
+  address. Ghayma's edge overwrites the header, so no visitor can forge it
+  there; any other path to the app must overwrite it too, or the value must
+  not be trusted there.
+- **`verify2FA` and `refreshToken` accept `{ clientIp }`**, so the auth
+  service's rate limits on those calls count each end user.
+
+### Notes
+
+- The new parameters are optional; existing calls are unchanged.
+- The refreshes the SDK starts on its own (the auto-refresh timer, or an
+  authenticated call such as `getUser()` finding the token expired) send no
+  `clientIp`, so server code should call `refreshToken({ clientIp })` itself
+  when a token may have expired. A call that joins a refresh already in
+  flight shares that request's options.
+- `@ghayma/auth` re-exports the client entry and depends on `@ghayma/sdk`
+  `^1.1.0`, so a fresh install or a lockfile update brings `getClientIp`
+  there too; the alias needs no release.
+
 ## 1.5.0
 
 The client entry reads the auth server key under its Ghayma names.

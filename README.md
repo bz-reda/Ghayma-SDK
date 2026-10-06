@@ -98,6 +98,7 @@ A `two_fa_enrollment_required` result means the app enforces 2FA and the user ha
 - **Auth** — `listApps`, `getApp`, `getStats`, `listUsers`, `disableUser`, `enableUser`, `deleteUser`, `resetUser2FA`, `generatePasswordResetLink`, `updateUserAppMetadata`
 - **Storage** — `listBuckets`, `getBucket`, `getCredentials`, `upload`, `listObjects`, `listAllObjects`, `deleteObject`, `download`, `getUploadUrl`, `getDownloadUrl`
 - **Database** — `list`, `get`, `getCredentials`, `getConnection`, `getMetrics`
+- **Visitor IP** — `getClientIp`
 
 **`@ghayma/sdk/client` (browser)**
 
@@ -106,6 +107,7 @@ A `two_fa_enrollment_required` result means the app enforces 2FA and the user ha
 - **Profile** — `getUser`, `updateUser`, `changePassword`, `changeEmail`, `cancelEmailChange`, `deleteAccount`
 - **Passwords and email** — `forgotPassword`, `resetPassword`, `verifyResetToken`, `resendVerification`
 - **OAuth** — `signInWithOAuth`, `handleOAuthRedirect`, `getOAuthUrl`, `getGoogleAuthUrl`, `getGitHubAuthUrl`, `exchangeCodeForSession`, `signInWithIdToken`, `generatePkce`, `handleOAuthCallback`, `handleOAuthFragment`
+- **Visitor IP** — `getClientIp`, for server code that forwards it as `clientIp`
 
 The project API key is a secret and **never ships to a browser**: the client entry authenticates with your app slug alone, so the key stays on your server where you created the `Ghayma` client.
 
@@ -392,9 +394,13 @@ When your own server calls the auth service, every request arrives from one IP a
 ```ts
 // app/api/register/route.ts — a client per request, never module-level
 const auth = new GhaymaAuth({ appSlug: "my-app", autoRefresh: false });
-const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0] ?? undefined;
+const clientIp = getClientIp(req);
 await auth.register({ email, password }, { clientIp });
 ```
+
+`getClientIp` reads the `X-Real-IP` header and returns it only when it holds one valid IP address; otherwise it returns `undefined`, and the call goes out without one. On Ghayma, the edge overwrites `X-Real-IP` on every request, so no visitor can forge it. If your app is also reachable another way (another host, its own proxy), that path must overwrite `X-Real-IP` too, or the value must not be trusted there.
+
+The refreshes the SDK starts on its own (the auto-refresh timer, or an authenticated call such as `getUser()` finding the token expired) send no `clientIp`, so server code should call `refreshToken({ clientIp })` itself when a token may have expired. A call that joins a refresh already in flight shares that request's options.
 
 The key is a secret: constructing a client with a `serverKey` in a browser throws.
 
@@ -402,13 +408,13 @@ The key is a secret: constructing a client with a `serverKey` in a browser throw
 
 ```ts
 // Server
-import { Ghayma } from "@ghayma/sdk";
+import { Ghayma, getClientIp } from "@ghayma/sdk";
 import { StorageClient } from "@ghayma/sdk/storage";
 import { AuthClient } from "@ghayma/sdk/auth";
 import { DatabaseClient } from "@ghayma/sdk/database";
 
 // Browser
-import { GhaymaAuth } from "@ghayma/sdk/client";
+import { GhaymaAuth, getClientIp } from "@ghayma/sdk/client";
 ```
 
 ## Environment variables
