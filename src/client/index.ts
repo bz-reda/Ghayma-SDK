@@ -33,6 +33,8 @@ import type {
 
 export { AuthError, PKCE_STORAGE_KEY, TwoFactorRequiredError, generatePkce, pkceChallenge };
 export type { PkcePair } from "./pkce.js";
+export { getClientIp } from "../client-ip.js";
+export type { ClientIpSource } from "../client-ip.js";
 export type {
   AuthConfig,
   AuthEvent,
@@ -194,9 +196,15 @@ export class GhaymaAuth {
 
   // ==================== Two-factor authentication ====================
 
-  /** Complete a pending 2FA login with a TOTP or recovery code. */
-  async verify2FA(params: { challenge_token: string; code: string }): Promise<Session> {
-    const data = await this.http.post<Session>("/2fa/verify", params);
+  /**
+   * Complete a pending 2FA login with a TOTP or recovery code.
+   *
+   * @param options.clientIp — the end user's IP, forwarded so the service
+   *   rate-limits per end user instead of per calling server. Needs a
+   *   `serverKey`; without one it is ignored and nothing extra is sent.
+   */
+  async verify2FA(params: { challenge_token: string; code: string }, options?: RequestOptions): Promise<Session> {
+    const data = await this.http.post<Session>("/2fa/verify", params, false, options);
     this.setSession(data, "SIGNED_IN");
     return data;
   }
@@ -270,9 +278,14 @@ export class GhaymaAuth {
    * share one request, and tabs sharing localStorage take turns: a tab that
    * finds the token already rotated by another takes that pair over. A spent
    * token presented again makes the service end every session of the user.
+   *
+   * @param options.clientIp — the end user's IP, forwarded so the service
+   *   rate-limits per end user instead of per calling server. Needs a
+   *   `serverKey`; without one it is ignored and nothing extra is sent.
+   *   Concurrent calls share one request, so the first caller's options apply.
    */
-  async refreshToken(): Promise<TokenPair> {
-    this.refreshing ??= this.tokens.exclusive(() => this.rotate()).finally(() => {
+  async refreshToken(options?: RequestOptions): Promise<TokenPair> {
+    this.refreshing ??= this.tokens.exclusive(() => this.rotate(options)).finally(() => {
       this.refreshing = null;
     });
     return this.refreshing;
@@ -616,7 +629,7 @@ export class GhaymaAuth {
   }
 
   /** Spend the refresh token, unless another tab already rotated in a pair that is still valid. */
-  private async rotate(): Promise<TokenPair> {
+  private async rotate(options?: RequestOptions): Promise<TokenPair> {
     if (this.tokens.sync() && this.tokens.hasSession() && !this.tokens.isExpired()) {
       this.emit("TOKEN_REFRESHED");
       this.scheduleRefresh();
@@ -631,9 +644,7 @@ export class GhaymaAuth {
     }
 
     try {
-      const data = await this.http.post<TokenPair>("/refresh", {
-        refresh_token: refreshToken,
-      });
+      const data = await this.http.post<TokenPair>("/refresh", { refresh_token: refreshToken }, false, options);
       this.setSession(data, "TOKEN_REFRESHED");
       return data;
     } catch (err) {

@@ -349,3 +349,23 @@ describe("AuthError.retryAfter", () => {
     );
   });
 });
+
+describe("clientIp on verify2FA and refreshToken", () => {
+  test("verify2FA forwards the visitor with the key", async () => {
+    const calls = stubFetch({ "/2fa/verify": sessionResponse() });
+    const auth = newClient({ serverKey: KEY });
+    await auth.verify2FA({ challenge_token: "ch", code: "123456" }, { clientIp: "1.2.3.4" });
+    assert.equal(serverKeyHeader(calls[0].headers), KEY);
+    assert.equal(clientIpHeader(calls[0].headers), "1.2.3.4");
+  });
+
+  test("refreshToken forwards the visitor with the key", async () => {
+    const calls = stubFetch({ "/login": sessionResponse("access-1", 1), "/refresh": sessionResponse("access-2") });
+    const auth = newClient({ serverKey: KEY });
+    await auth.login({ email: "user@test.local", password: "securepass123" });
+    await auth.refreshToken({ clientIp: "1.2.3.4" });
+    const refresh = calls.find((c) => c.path === "/refresh");
+    assert.equal(serverKeyHeader(refresh.headers), KEY);
+    assert.equal(clientIpHeader(refresh.headers), "1.2.3.4");
+  });
+});
