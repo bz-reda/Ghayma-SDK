@@ -165,6 +165,14 @@ export const valkeyDatabase: Database = {
   updated_at: "2026-10-08T09:00:00Z",
 };
 
+/** paas-api 787d352 internal/databases/explorer.go — Metrics on a database that is not running */
+export const databaseMetricsResizing: DatabaseMetrics = {
+  status: "resizing",
+  size_bytes: 0,
+  size_readable: "",
+  active_connections: 0,
+};
+
 /** paas-api 787d352 internal/databases/explorer.go — valkeyMetrics */
 export const valkeyMetrics: DatabaseMetrics = {
   status: "running",

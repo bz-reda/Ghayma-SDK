@@ -145,7 +145,6 @@ export const VALKEY_DATABASE = {
   memory_mb: 256,
   disk_gb: 1,
   backup_tier_slug: "weekly",
-  external_access: false,
   replica_set: false,
   valkey_mode: "cache",
   cpu_request: "50m",
@@ -163,6 +162,14 @@ export const VALKEY_DATABASE_ERROR = {
   status: "error",
   valkey_mode: "store",
   status_message: "the database did not become ready within 10 minutes",
+};
+
+/** paas-api 787d352 internal/databases/explorer.go — Metrics on a database that is not running */
+export const DATABASE_METRICS_RESIZING = {
+  status: "resizing",
+  size_bytes: 0,
+  size_readable: "",
+  active_connections: 0,
 };
 
 /** paas-api 787d352 internal/databases/explorer.go — valkeyMetrics */

@@ -7,8 +7,8 @@ export type ValkeyMode = "cache" | "store";
 /** @deprecated use DatabaseType — retained so pre-0.5 imports keep resolving. */
 export type DatabaseEngine = DatabaseType;
 
-/** Lifecycle status of a managed database. */
-export type DatabaseStatus = "provisioning" | "running" | "stopped" | "error";
+/** Lifecycle status of a managed database; `resizing` while its disk moves to a new size. */
+export type DatabaseStatus = "provisioning" | "running" | "stopped" | "error" | "resizing";
 
 /** Scheduled-backup cadence (backup_tiers.slug). `weekly` is free. */
 export type BackupTierSlug = "weekly" | "daily" | "sixhourly";

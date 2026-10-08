@@ -19,6 +19,7 @@ import {
   BUCKET_CREDENTIALS,
   DATABASE,
   DATABASE_METRICS,
+  DATABASE_METRICS_RESIZING,
   NO_SHARED_CREDENTIAL,
   VALKEY_DATABASE,
   VALKEY_DATABASE_ERROR,
@@ -178,6 +179,15 @@ test("database.getCredentials on a Valkey without a site key throws no_shared_cr
     assert.equal(err.message, NO_SHARED_CREDENTIAL.error);
     return true;
   });
+});
+
+test("database.getMetrics on a resizing database returns its status alone", async () => {
+  stubFetch({ metrics: DATABASE_METRICS_RESIZING });
+
+  const metrics = await client().database.getMetrics("db-1");
+
+  assert.equal(metrics.status, "resizing");
+  assert.equal(metrics.extra, undefined);
 });
 
 test("auth.getStats reads the { stats } wrapper", async () => {
