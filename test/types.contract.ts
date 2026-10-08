@@ -16,6 +16,8 @@ import type {
   BucketCredentials,
   Database,
   DatabaseMetrics,
+  DatabaseType,
+  ValkeyMode,
 } from "../src/index.js";
 import { AuthError, TwoFactorRequiredError } from "../src/client/index.js";
 import type { GhaymaAuth, TwoFAEnrollmentRequired, TwoFARequired } from "../src/client/index.js";
@@ -130,6 +132,57 @@ export const databaseMetrics: DatabaseMetrics = {
   max_connections: 25,
   extra: { table_count: 8, total_rows: 1420 },
 };
+
+/** paas-api 787d352 internal/databases/model.go + valkey_provision.go — a Valkey row */
+export const valkeyDatabase: Database = {
+  id: "77777777-7777-7777-7777-777777777777",
+  user_id: "22222222-2222-2222-2222-222222222222",
+  project_id: "33333333-3333-3333-3333-333333333333",
+  name: "cache",
+  type: "valkey",
+  version: "9.1",
+  status: "error",
+  status_message: "the database did not become ready within 10 minutes",
+  host: "vk-cache-77777777.pdb-33333333-3333-3333-3333-333333333333.svc.cluster.local",
+  port: 6379,
+  username: "ghayma",
+  storage_mb: 1024,
+  storage_used_bytes: 0,
+  cpu_milli: 250,
+  memory_mb: 256,
+  disk_gb: 1,
+  backup_tier_slug: "weekly",
+  // Mirrors the postgres pin above: the backend stopped sending it 2026-09-22 (c88bbe6).
+  external_access: false,
+  replica_set: false,
+  valkey_mode: "store",
+  cpu_request: "50m",
+  cpu_limit: "250m",
+  memory_request: "128Mi",
+  memory_limit: "256Mi",
+  tier_slug: "s",
+  created_at: "2026-10-08T09:00:00Z",
+  updated_at: "2026-10-08T09:00:00Z",
+};
+
+/** paas-api 787d352 internal/databases/explorer.go — valkeyMetrics */
+export const valkeyMetrics: DatabaseMetrics = {
+  status: "running",
+  size_bytes: 2048,
+  size_readable: "2.0 KB",
+  active_connections: 2,
+  extra: {
+    keys: 42,
+    maxmemory_bytes: 187904819,
+    evicted_keys: 0,
+    keyspace_hits: 310,
+    keyspace_misses: 7,
+    mode: "cache",
+  },
+};
+
+export const valkeyType: DatabaseType = "valkey";
+export const valkeyModes: ValkeyMode[] = ["cache", "store"];
 
 /** paas-api internal/storage/model.go — StorageBucket */
 export const bucket: Bucket = {

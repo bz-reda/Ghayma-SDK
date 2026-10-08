@@ -127,6 +127,79 @@ export const DATABASE_METRICS = {
   },
 };
 
+/** paas-api 787d352 internal/databases/model.go + valkey_provision.go — a Valkey row */
+export const VALKEY_DATABASE = {
+  id: "77777777-7777-7777-7777-777777777777",
+  user_id: "22222222-2222-2222-2222-222222222222",
+  project_id: "33333333-3333-3333-3333-333333333333",
+  name: "cache",
+  type: "valkey",
+  version: "9.1",
+  status: "running",
+  host: "vk-cache-77777777.pdb-33333333-3333-3333-3333-333333333333.svc.cluster.local",
+  port: 6379,
+  username: "ghayma",
+  storage_mb: 1024,
+  storage_used_bytes: 0,
+  cpu_milli: 250,
+  memory_mb: 256,
+  disk_gb: 1,
+  backup_tier_slug: "weekly",
+  external_access: false,
+  replica_set: false,
+  valkey_mode: "cache",
+  cpu_request: "50m",
+  cpu_limit: "250m",
+  memory_request: "128Mi",
+  memory_limit: "256Mi",
+  tier_slug: "s",
+  created_at: "2026-10-08T09:00:00Z",
+  updated_at: "2026-10-08T09:00:00Z",
+};
+
+/** paas-api 787d352 internal/databases/valkey_start.go — a Valkey that never became ready */
+export const VALKEY_DATABASE_ERROR = {
+  ...VALKEY_DATABASE,
+  status: "error",
+  valkey_mode: "store",
+  status_message: "the database did not become ready within 10 minutes",
+};
+
+/** paas-api 787d352 internal/databases/explorer.go — valkeyMetrics */
+export const VALKEY_METRICS = {
+  status: "running",
+  size_bytes: 2048,
+  size_readable: "2.0 KB",
+  active_connections: 2,
+  extra: {
+    keys: 42,
+    maxmemory_bytes: 187904819,
+    evicted_keys: 0,
+    keyspace_hits: 310,
+    keyspace_misses: 7,
+    mode: "cache",
+  },
+};
+
+/** paas-api 787d352 internal/databases/handler.go — siteCredentialBody, Valkey site key */
+export const VALKEY_SITE_CREDENTIALS = {
+  type: "valkey",
+  host: VALKEY_DATABASE.host,
+  port: 6379,
+  username: "c_9a8b7c6d",
+  password: "s1te-pw",
+  database: "",
+  internal_url: `redis://c_9a8b7c6d:s1te-pw@${VALKEY_DATABASE.host}:6379/0`,
+  level: "connect",
+  credential: "connection",
+};
+
+/** paas-api 787d352 internal/databases/handler.go — GetCredentials, Valkey with a user token */
+export const NO_SHARED_CREDENTIAL = {
+  error: "Valkey has no shared credential: every connected site has its own user (see the site's connections)",
+  code: "no_shared_credential",
+};
+
 /** paas-api internal/storage/model.go — StorageBucket */
 export const BUCKET = {
   id: "88888888-8888-8888-8888-888888888888",

@@ -15,10 +15,11 @@ export type {
   DatabaseMetrics,
   DatabaseStatus,
   DatabaseType,
+  ValkeyMode,
 } from "./types.js";
 
 /**
- * Database — connect your app to its managed PostgreSQL or MongoDB.
+ * Database — connect your app to its managed PostgreSQL, MongoDB or Valkey.
  *
  * Read the databases this key can see, get their credentials and a
  * ready-to-use connection config, and read live metrics. Creating,
@@ -83,6 +84,10 @@ export class DatabaseClient {
    * // With mongoose
    * const conn = await client.database.getConnection("mongo-id");
    * await mongoose.connect(conn.url);
+   *
+   * // With ioredis — a Valkey answers only a site's own key, with that site's login
+   * const conn = await client.database.getConnection("valkey-id");
+   * const redis = new Redis(conn.url);
    * ```
    */
   async getConnection(databaseId: string): Promise<ConnectionConfig> {
