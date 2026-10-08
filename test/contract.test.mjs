@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { Ghayma } from "../dist/index.js";
+import { Ghayma, GhaymaError } from "../dist/index.js";
 import {
   AUTH_APP,
   AUTH_STATS,
@@ -19,6 +19,12 @@ import {
   BUCKET_CREDENTIALS,
   DATABASE,
   DATABASE_METRICS,
+  DATABASE_METRICS_RESIZING,
+  NO_SHARED_CREDENTIAL,
+  VALKEY_DATABASE,
+  VALKEY_DATABASE_ERROR,
+  VALKEY_METRICS,
+  VALKEY_SITE_CREDENTIALS,
 } from "./fixtures.mjs";
 
 /** Stub globalThis.fetch with a fixed response; returns the recorded calls. */
@@ -107,6 +113,81 @@ test("database.getMetrics reads the { metrics } wrapper", async () => {
   assert.equal(metrics.active_connections, 3);
   assert.equal(metrics.size_readable, "12.0 MB");
   assert.equal(metrics.status, "running");
+});
+
+// ── Valkey ─────────────────────────────────────────────────────
+
+test("database.get surfaces a Valkey's type and mode", async () => {
+  stubFetch({ database: VALKEY_DATABASE });
+
+  const db = await client().database.get("db-vk");
+
+  assert.equal(db.type, "valkey");
+  assert.equal(db.valkey_mode, "cache");
+  assert.equal(db.port, 6379);
+  assert.equal(db.status_message, undefined);
+});
+
+test("database.get surfaces why a Valkey is in error", async () => {
+  stubFetch({ database: VALKEY_DATABASE_ERROR });
+
+  const db = await client().database.get("db-vk");
+
+  assert.equal(db.status, "error");
+  assert.equal(db.valkey_mode, "store");
+  assert.equal(db.status_message, VALKEY_DATABASE_ERROR.status_message);
+});
+
+test("database.list keeps every engine", async () => {
+  stubFetch({ databases: [DATABASE, VALKEY_DATABASE] });
+
+  const dbs = await client().database.list();
+
+  assert.deepEqual(dbs.map((d) => d.type), ["postgres", "valkey"]);
+});
+
+test("database.getMetrics passes a Valkey's counters through", async () => {
+  stubFetch({ metrics: VALKEY_METRICS });
+
+  const metrics = await client().database.getMetrics("db-vk");
+
+  assert.deepEqual(metrics.extra, VALKEY_METRICS.extra);
+  assert.equal(metrics.max_connections, undefined);
+});
+
+test("database.getConnection with a site key returns the site's own Valkey URL", async () => {
+  const calls = stubFetch(VALKEY_SITE_CREDENTIALS);
+
+  const conn = await client().database.getConnection("db-vk");
+
+  assert.equal(calls[0].url.pathname, "/api/v1/databases/db-vk/credentials");
+  assert.equal(conn.url, VALKEY_SITE_CREDENTIALS.internal_url);
+  assert.match(conn.url, /^redis:\/\/c_9a8b7c6d:/);
+  assert.equal(conn.host, VALKEY_DATABASE.host);
+  assert.equal(conn.port, 6379);
+  assert.equal(conn.username, "c_9a8b7c6d");
+  assert.equal(conn.database, "");
+});
+
+test("database.getCredentials on a Valkey without a site key throws no_shared_credential", async () => {
+  stubFetch(NO_SHARED_CREDENTIAL, 409);
+
+  await assert.rejects(client().database.getCredentials("db-vk"), (err) => {
+    assert.ok(err instanceof GhaymaError);
+    assert.equal(err.status, 409);
+    assert.equal(err.code, "no_shared_credential");
+    assert.equal(err.message, NO_SHARED_CREDENTIAL.error);
+    return true;
+  });
+});
+
+test("database.getMetrics on a resizing database returns its status alone", async () => {
+  stubFetch({ metrics: DATABASE_METRICS_RESIZING });
+
+  const metrics = await client().database.getMetrics("db-1");
+
+  assert.equal(metrics.status, "resizing");
+  assert.equal(metrics.extra, undefined);
 });
 
 test("auth.getStats reads the { stats } wrapper", async () => {

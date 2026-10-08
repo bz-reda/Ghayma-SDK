@@ -312,7 +312,7 @@ console.log(stats.total_users, stats.logins_today);
 
 ## Database
 
-Connect your app to its managed PostgreSQL or MongoDB.
+Connect your app to its managed PostgreSQL, MongoDB or Valkey.
 
 ### Get a connection string
 
@@ -328,6 +328,15 @@ const pool = new Pool({ connectionString: conn.url });
 // MongoDB with mongoose
 import mongoose from "mongoose";
 await mongoose.connect(conn.url);
+```
+
+A Valkey (Redis protocol) has no shared credential: each connected site has its own login. Read it with the site's own key, the `GHAYMA_API_KEY` Ghayma injects into the site; the URL is the one the site already has as `REDIS_URL` (or `REDIS_URL_<NAME>` when the project has several Valkeys). An account token gets `409 no_shared_credential`.
+
+```ts
+// Valkey with ioredis
+import Redis from "ioredis";
+const cache = await ghayma.database.getConnection("valkey-id"); // redis://c_…@…:6379/0
+const redis = new Redis(cache.url);
 ```
 
 ### Details, credentials and metrics
@@ -421,7 +430,7 @@ import { GhaymaAuth, getClientIp } from "@ghayma/sdk/client";
 
 | Variable | Read by | Purpose |
 |---|---|---|
-| `GHAYMA_API_KEY` | server entry | The project API key. Set it in your site's environment variables today; automatic injection arrives with Connections |
+| `GHAYMA_API_KEY` | server entry | The project API key. Connected apps get it injected, so `new Ghayma()` works with no arguments; elsewhere pass it as `apiKey` |
 | `GHAYMA_API_URL` | server entry | Base URL override (an explicit `baseUrl` still wins) |
 | `GHAYMA_AUTH_SERVER_KEY_<SLUG>` | client entry, server-side only | The auth app's server key, injected into connected apps. `<SLUG>` is the app slug uppercased, every other character turned into `_` (`my-app` → `MY_APP`) |
 | `GHAYMA_AUTH_SERVER_KEY` | client entry, server-side only | The server key of the oldest auth app connected to the site, read when the slug-scoped one is unset |

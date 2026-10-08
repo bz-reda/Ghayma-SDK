@@ -1,11 +1,14 @@
 /** Database type slug, matching the backend's `type` field (create + responses). */
-export type DatabaseType = "postgres" | "mongodb";
+export type DatabaseType = "postgres" | "mongodb" | "valkey";
+
+/** Valkey mode: `cache` evicts least-recently-used keys when memory is full; `store` never evicts and keeps an append-only file. */
+export type ValkeyMode = "cache" | "store";
 
 /** @deprecated use DatabaseType — retained so pre-0.5 imports keep resolving. */
 export type DatabaseEngine = DatabaseType;
 
-/** Lifecycle status of a managed database. */
-export type DatabaseStatus = "provisioning" | "running" | "stopped" | "error";
+/** Lifecycle status of a managed database; `resizing` while its disk moves to a new size. */
+export type DatabaseStatus = "provisioning" | "running" | "stopped" | "error" | "resizing";
 
 /** Scheduled-backup cadence (backup_tiers.slug). `weekly` is free. */
 export type BackupTierSlug = "weekly" | "daily" | "sixhourly";
@@ -21,9 +24,13 @@ export interface Database {
   type: DatabaseType;
   version: string;
   status: DatabaseStatus;
+  /** Why the database is in `error`, e.g. a Valkey that never became ready. */
+  status_message?: string;
   host: string;
   port: number;
+  /** Absent for Valkey. */
   db_name?: string;
+  /** For Valkey, the platform's own user: apps connect with their site's credential. */
   username?: string;
   /** Sizing bracket from database_tiers — the persisted sizing decision. */
   tier_slug: string;
@@ -44,6 +51,8 @@ export interface Database {
   max_connections?: number;
   /** MongoDB single-node replica-set mode. */
   replica_set: boolean;
+  /** Present only for Valkey. */
+  valkey_mode?: ValkeyMode;
   external_access: boolean;
   /** Present only when external access is enabled. */
   external_host?: string;
@@ -52,7 +61,11 @@ export interface Database {
   updated_at: string;
 }
 
-/** Database connection credentials (matches GET /databases/:id/credentials). */
+/**
+ * Database connection credentials (matches GET /databases/:id/credentials).
+ * A Valkey has no shared credential: a site's own key reads that site's login
+ * (`database` empty); an account token gets `409 no_shared_credential`.
+ */
 export interface DatabaseCredentials {
   type: DatabaseType;
   host: string;
@@ -83,13 +96,14 @@ export interface DatabaseMetrics {
    * Engine-specific counters.
    * postgres: table_count, total_rows, cache_hit_ratio, index_usage_ratio, dead_tuples.
    * mongodb: data_size, objects, collections, indexes.
+   * valkey: keys, maxmemory_bytes, evicted_keys, keyspace_hits, keyspace_misses, mode.
    */
   extra?: Record<string, unknown>;
 }
 
 /** Connection string helpers */
 export interface ConnectionConfig {
-  /** Full connection string (e.g., postgresql://user:pass@host:port/db) */
+  /** Full connection string (e.g., postgresql://user:pass@host:port/db, redis://user:pass@host:6379/0) */
   url: string;
   /** Individual components */
   host: string;

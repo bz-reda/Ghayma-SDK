@@ -108,4 +108,5 @@ export type {
   DatabaseMetrics,
   DatabaseStatus,
   DatabaseType,
+  ValkeyMode,
 } from "./database/index.js";
