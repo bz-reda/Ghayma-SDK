@@ -28,9 +28,9 @@ export type {
  * Storage — read and write the objects in your app's buckets.
  *
  * Upload, download, list and delete objects, mint presigned URLs for the
- * browser, and read a bucket's S3 credentials. Creating and deleting
- * buckets, rotating their credentials and switching them public or private
- * are management: they live in the console and the `ghayma` CLI.
+ * browser, and read your site's own S3 key for a bucket. Creating and
+ * deleting buckets, switching them public or private and rotating an app's
+ * key are management: they live in the console and the `ghayma` CLI.
  *
  * @example
  * ```ts
@@ -65,7 +65,17 @@ export class StorageClient {
     return res.bucket;
   }
 
-  /** Get S3 credentials for direct access */
+  /**
+   * Get your site's own S3 key for a bucket, for direct access.
+   *
+   * With the site's `GHAYMA_API_KEY`: that site's own key.
+   * `409 no_own_credential` while the connection waits for one (retry in a
+   * few minutes), and `409 credentials_not_ready` while the bucket is still
+   * being provisioned. A deprecated account token gets `410`: a bucket's own
+   * key is never handed out. A project-wide key gets
+   * `403 site_key_required`, and a site not connected to the bucket
+   * `403 not_connected`.
+   */
   async getCredentials(bucketId: string): Promise<BucketCredentials> {
     const res = await this.http.get<{ credentials: BucketCredentials }>(
       `/api/v1/storage/${bucketId}/credentials`

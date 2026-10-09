@@ -2,6 +2,60 @@
 
 Releases before 0.6.0 are documented in the git history.
 
+## 1.8.0
+
+Every credential the SDK reads is the site's own. `getCredentials` and
+`getConnection` answer only the `GHAYMA_API_KEY` Ghayma injects into a
+connected site, with that site's own login or key; a database's own login and
+a bucket's own key are never handed out. The old database external-access
+fields are gone.
+
+### Changed
+
+- **`database.getConnection` is in-cluster only**: `url` is the site's
+  `internal_url`, which works from the site's pods. It no longer switches to
+  an external address. From a laptop, use `ghayma connect --local`.
+- **`getCredentials`** (database and storage) returns the site's own
+  credential, for every engine. While the site's connection waits for one it
+  answers `409 no_own_credential` (retry in a few minutes); a project-wide key
+  gets `403 site_key_required`, a site that is not connected
+  `403 not_connected`, and an account token `410 shared_credentials_retired`.
+  This replaces the Valkey-only `409 no_shared_credential` of 1.7.0.
+
+### Added
+
+- **`DatabaseCredentials.level`** (`"read-only"` or `"connect"`) and
+  **`BucketCredentials.level`** (`"read"` or `"read-write"`): the connection's
+  level. A `read` bucket key cannot write.
+- **`DatabaseCredentials.credential`** and **`BucketCredentials.credential`**:
+  always `"connection"`, the site's own credential.
+- **`Bucket.endpoint`**: the S3 endpoint the bucket is reached on. No key
+  travels with it.
+
+### Deprecated
+
+- **`Database.username`**: not sent since October 2026 — the database's own
+  login is never handed out.
+
+### Removed
+
+- **`Database.external_access`, `external_host` and `external_port`**, and
+  **`DatabaseCredentials.external_access`, `external_host`, `external_port`
+  and `external_url`**: the backend no longer sends them. A system outside
+  Ghayma reaches a database through a named principal with its own
+  credential: `ghayma access add database <name> --name <principal>`.
+  `Bucket.external_access` (a public bucket) stays.
+
+### Notes
+
+- Code that reads a removed field no longer compiles; drop the read, since
+  the value was never sent.
+- The README's migration table maps `storage.rotateCredentials()` and
+  `database.rotateCredentials()` to `ghayma connections rotate`, which gives
+  one app a new credential. `ghayma db expose` is retired.
+- From a laptop, a bucket is reached with `ghayma env pull` (your site's
+  `STORAGE_*` variables; the S3 endpoint is public).
+
 ## 1.7.0
 
 The database types know managed Valkey.

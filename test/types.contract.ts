@@ -15,6 +15,7 @@ import type {
   Bucket,
   BucketCredentials,
   Database,
+  DatabaseCredentials,
   DatabaseMetrics,
   DatabaseType,
   ValkeyMode,
@@ -91,7 +92,7 @@ export const authStats: AuthStats = {
   ],
 };
 
-/** paas-api internal/databases/model.go + response.go */
+/** paas-api 856337f internal/databases/model.go + response.go */
 export const database: Database = {
   id: "66666666-6666-6666-6666-666666666666",
   user_id: "22222222-2222-2222-2222-222222222222",
@@ -103,7 +104,6 @@ export const database: Database = {
   host: "my-postgres.databases.svc.cluster.local",
   port: 5432,
   db_name: "app",
-  username: "app",
   storage_mb: 1024,
   storage_used_bytes: 12582912,
   cpu_milli: 250,
@@ -111,7 +111,6 @@ export const database: Database = {
   max_connections: 25,
   disk_gb: 1,
   backup_tier_slug: "weekly",
-  external_access: false,
   replica_set: false,
   cpu_request: "50m",
   cpu_limit: "250m",
@@ -133,7 +132,7 @@ export const databaseMetrics: DatabaseMetrics = {
   extra: { table_count: 8, total_rows: 1420 },
 };
 
-/** paas-api 787d352 internal/databases/model.go + valkey_provision.go — a Valkey row */
+/** paas-api 856337f internal/databases/model.go + valkey_provision.go — a Valkey row */
 export const valkeyDatabase: Database = {
   id: "77777777-7777-7777-7777-777777777777",
   user_id: "22222222-2222-2222-2222-222222222222",
@@ -145,15 +144,12 @@ export const valkeyDatabase: Database = {
   status_message: "the database did not become ready within 10 minutes",
   host: "vk-cache-77777777.pdb-33333333-3333-3333-3333-333333333333.svc.cluster.local",
   port: 6379,
-  username: "ghayma",
   storage_mb: 1024,
   storage_used_bytes: 0,
   cpu_milli: 250,
   memory_mb: 256,
   disk_gb: 1,
   backup_tier_slug: "weekly",
-  // Mirrors the postgres pin above: the backend stopped sending it 2026-09-22 (c88bbe6).
-  external_access: false,
   replica_set: false,
   valkey_mode: "store",
   cpu_request: "50m",
@@ -189,10 +185,42 @@ export const valkeyMetrics: DatabaseMetrics = {
   },
 };
 
+/** paas-api 856337f internal/databases/handler.go — siteCredentialBody, a Postgres site key */
+export const databaseCredentials: DatabaseCredentials = {
+  type: "postgres",
+  host: "my-postgres.databases.svc.cluster.local",
+  port: 5432,
+  username: "c_3f1a2b3c",
+  password: "s1te-pw",
+  database: "app",
+  internal_url: "postgresql://c_3f1a2b3c:s1te-pw@my-postgres.databases.svc.cluster.local:5432/app",
+  level: "connect",
+  credential: "connection",
+};
+
+/** paas-api 856337f internal/databases/handler.go — siteCredentialBody, a Valkey site key */
+export const valkeyCredentials: DatabaseCredentials = {
+  type: "valkey",
+  host: "vk-cache-77777777.pdb-33333333-3333-3333-3333-333333333333.svc.cluster.local",
+  port: 6379,
+  username: "c_9a8b7c6d",
+  password: "s1te-pw",
+  database: "",
+  internal_url: "redis://c_9a8b7c6d:s1te-pw@vk-cache-77777777.pdb-33333333-3333-3333-3333-333333333333.svc.cluster.local:6379/0",
+  level: "read-only",
+  credential: "connection",
+};
+
+// The old database external access is gone from the contract (2026-10-09).
+// @ts-expect-error removed
+export const noDatabaseExternal: Database["external_access"] = false;
+// @ts-expect-error removed
+export const noCredentialsExternalUrl: DatabaseCredentials["external_url"] = "";
+
 export const valkeyType: DatabaseType = "valkey";
 export const valkeyModes: ValkeyMode[] = ["cache", "store"];
 
-/** paas-api internal/storage/model.go — StorageBucket */
+/** paas-api 856337f internal/storage/model.go — StorageBucket, through withPublicURL */
 export const bucket: Bucket = {
   id: "88888888-8888-8888-8888-888888888888",
   user_id: "22222222-2222-2222-2222-222222222222",
@@ -204,18 +232,21 @@ export const bucket: Bucket = {
   is_public: false,
   external_access: false,
   status: "active",
+  endpoint: "https://s3.ghayma.tech",
   allowed_origins: ["https://example.com"],
   created_at: "2026-07-01T10:00:00Z",
   updated_at: "2026-07-31T10:00:00Z",
 };
 
-/** paas-api internal/storage/service.go — GetCredentials return map */
+/** paas-api 856337f internal/storage/handler.go — siteCredentialBody */
 export const bucketCredentials: BucketCredentials = {
   access_key: "GK1234567890abcdef",
-  secret_key: "s3cr3t",
+  secret_key: "s1te-s3cr3t",
   bucket: "u22222222-my-assets",
   endpoint: "https://s3.ghayma.tech",
   region: "garage",
+  level: "read",
+  credential: "connection",
 };
 
 /** paas-api api/openapi/auth.v1.yaml — TwoFARequired (POST /login, /oauth/exchange, /oauth/id-token) */

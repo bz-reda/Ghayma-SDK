@@ -79,7 +79,7 @@ export const AUTH_STATS = {
   ],
 };
 
-/** paas-api internal/databases/model.go + response.go — ManagedDatabaseAPIResponse */
+/** paas-api 856337f internal/databases/model.go + response.go — ManagedDatabaseAPIResponse (no username, no external_*) */
 export const DATABASE = {
   id: "66666666-6666-6666-6666-666666666666",
   user_id: "22222222-2222-2222-2222-222222222222",
@@ -91,7 +91,6 @@ export const DATABASE = {
   host: "my-postgres.databases.svc.cluster.local",
   port: 5432,
   db_name: "app",
-  username: "app",
   storage_mb: 1024,
   storage_used_bytes: 12582912,
   cpu_milli: 250,
@@ -99,7 +98,6 @@ export const DATABASE = {
   max_connections: 25,
   disk_gb: 1,
   backup_tier_slug: "weekly",
-  external_access: false,
   replica_set: false,
   cpu_request: "50m",
   cpu_limit: "250m",
@@ -127,7 +125,7 @@ export const DATABASE_METRICS = {
   },
 };
 
-/** paas-api 787d352 internal/databases/model.go + valkey_provision.go — a Valkey row */
+/** paas-api 856337f internal/databases/model.go + valkey_provision.go — a Valkey row */
 export const VALKEY_DATABASE = {
   id: "77777777-7777-7777-7777-777777777777",
   user_id: "22222222-2222-2222-2222-222222222222",
@@ -138,7 +136,6 @@ export const VALKEY_DATABASE = {
   status: "running",
   host: "vk-cache-77777777.pdb-33333333-3333-3333-3333-333333333333.svc.cluster.local",
   port: 6379,
-  username: "ghayma",
   storage_mb: 1024,
   storage_used_bytes: 0,
   cpu_milli: 250,
@@ -188,7 +185,7 @@ export const VALKEY_METRICS = {
   },
 };
 
-/** paas-api 787d352 internal/databases/handler.go — siteCredentialBody, Valkey site key */
+/** paas-api 856337f internal/databases/handler.go — siteCredentialBody, a Valkey site key */
 export const VALKEY_SITE_CREDENTIALS = {
   type: "valkey",
   host: VALKEY_DATABASE.host,
@@ -201,13 +198,35 @@ export const VALKEY_SITE_CREDENTIALS = {
   credential: "connection",
 };
 
-/** paas-api 787d352 internal/databases/handler.go — GetCredentials, Valkey with a user token */
-export const NO_SHARED_CREDENTIAL = {
-  error: "Valkey has no shared credential: every connected site has its own user (see the site's connections)",
-  code: "no_shared_credential",
+/** paas-api 856337f internal/databases/handler.go — siteCredentialBody, a Postgres site key */
+export const DATABASE_CREDENTIALS_SITE_KEY = {
+  type: "postgres",
+  host: DATABASE.host,
+  port: 5432,
+  username: "c_3f1a2b3c",
+  password: "s1te-pw",
+  database: "app",
+  internal_url: `postgresql://c_3f1a2b3c:s1te-pw@${DATABASE.host}:5432/app`,
+  level: "connect",
+  credential: "connection",
 };
 
-/** paas-api internal/storage/model.go — StorageBucket */
+/** paas-api 856337f internal/projectkeys/site_credentials.go — RefuseNoOwnCredential, a database */
+export const NO_OWN_CREDENTIAL = {
+  error: "this site's connection to that database has no credential of its own yet — the platform gives it one as soon as the service can (it retries every ten minutes); retry later, or reconnect the site",
+  code: "no_own_credential",
+};
+
+/** paas-api 856337f internal/databases/handler.go — GetCredentials, a person (retiredDBCredentialsMessage) */
+export const DATABASE_CREDENTIALS_RETIRED = {
+  error:
+    "A database's own login is no longer shown to anyone: every app connected to my-postgres has its own credential in its variables. " +
+    "From your laptop: ghayma connect --local. For a system outside Ghayma: ghayma access add database my-postgres --name <principal>. " +
+    "Host, port and the variable names, without any password: ghayma db credentials my-postgres (CLI 0.14.0 or later).",
+  code: "shared_credentials_retired",
+};
+
+/** paas-api 856337f internal/storage/model.go — StorageBucket, through withPublicURL */
 export const BUCKET = {
   id: "88888888-8888-8888-8888-888888888888",
   user_id: "22222222-2222-2222-2222-222222222222",
@@ -219,16 +238,28 @@ export const BUCKET = {
   is_public: false,
   external_access: false,
   status: "active",
+  endpoint: "https://s3.ghayma.tech",
   allowed_origins: ["https://example.com"],
   created_at: "2026-07-01T10:00:00Z",
   updated_at: "2026-07-31T10:00:00Z",
 };
 
-/** paas-api internal/storage/service.go — GetCredentials return map */
-export const BUCKET_CREDENTIALS = {
+/** paas-api 856337f internal/storage/handler.go — siteCredentialBody */
+export const BUCKET_CREDENTIALS_SITE_KEY = {
   access_key: "GK1234567890abcdef",
-  secret_key: "s3cr3t",
+  secret_key: "s1te-s3cr3t",
   bucket: "u22222222-my-assets",
   endpoint: "https://s3.ghayma.tech",
   region: "garage",
+  level: "read-write",
+  credential: "connection",
+};
+
+/** paas-api 856337f internal/storage/handler.go — GetCredentials, a person (retiredBucketCredentialsMessage) */
+export const BUCKET_CREDENTIALS_RETIRED = {
+  error:
+    "A bucket's own key is no longer shown to anyone: every app connected to my-assets has its own key in its STORAGE_* variables. " +
+    "From your laptop: ghayma env pull (your site's STORAGE_* variables; the S3 endpoint is public). For a system outside Ghayma: ghayma access add bucket my-assets --name <principal>. " +
+    "Endpoint, bucket and the variable names, without any key: ghayma storage credentials my-assets (CLI 0.14.0 or later).",
+  code: "shared_credentials_retired",
 };

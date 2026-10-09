@@ -136,14 +136,13 @@ Everything that creates, destroys or reconfigures infrastructure left the SDK in
 | `auth.rotateKeys()` | `ghayma auth rotate-keys`, or the console's Auth page |
 | `storage.createBucket()` | `ghayma storage create` |
 | `storage.deleteBucket()` | `ghayma storage delete` |
-| `storage.rotateCredentials()` | `ghayma storage rotate` |
+| `storage.rotateCredentials()` | `ghayma connections rotate bucket <name> --site <slug>` (one app's key; the bucket's own key is never handed out) |
 | `storage.makePublic()` | `ghayma storage expose` |
 | `storage.makePrivate()` | `ghayma storage unexpose` |
 | `database.create()` | `ghayma db create` |
 | `database.delete()` | `ghayma db delete` |
 | `database.stop()` / `database.start()` | `ghayma db stop` / `ghayma db start` |
-| `database.rotateCredentials()` | `ghayma db rotate` |
-| `database.expose()` / `database.unexpose()` | `ghayma db expose` / `ghayma db unexpose` |
+| `database.rotateCredentials()` | `ghayma connections rotate database <name> --site <slug>` (one app's credential; the database's own login is never handed out) |
 | `database.createBackup()`, `listBackups()`, `restoreBackup()`, `deleteBackup()` | the console's database Backups tab |
 
 The credential changed too:
@@ -247,9 +246,9 @@ await ghayma.storage.deleteObject("bucket-id", "images/old-photo.jpg");
 
 ```ts
 const buckets = await ghayma.storage.listBuckets();
-const info = await ghayma.storage.getBucket("bucket-id");
+const info = await ghayma.storage.getBucket("bucket-id"); // info.endpoint: the S3 endpoint, no key
 
-// Point any S3 client at the bucket
+// Point any S3 client at the bucket with your site's own key
 const creds = await ghayma.storage.getCredentials("bucket-id");
 const s3 = new S3Client({
   endpoint: creds.endpoint,
@@ -257,7 +256,20 @@ const s3 = new S3Client({
   credentials: { accessKeyId: creds.access_key, secretAccessKey: creds.secret_key },
 });
 // creds.bucket is the underlying S3 bucket name to pass as `Bucket`
+// creds.level is "read" or "read-write": a read key cannot write
 ```
+
+`getCredentials` answers only the site's own key, the `GHAYMA_API_KEY` Ghayma injects into a site connected to the bucket. It returns that site's key, the one its `STORAGE_*` variables already carry; the bucket's own key is never handed out.
+
+| Answer | When |
+|---|---|
+| `409 no_own_credential` | The site's connection waits for a key of its own: retry in a few minutes. |
+| `409 credentials_not_ready` | The bucket is still being provisioned. |
+| `403 site_key_required` | A project-wide key (created under Project → Settings → API keys) has no connection of its own. |
+| `403 not_connected` | The site is not connected to the bucket. |
+| `410 shared_credentials_retired` | An account token: a bucket's own key is never handed out. |
+
+From your laptop: `ghayma env pull` (your site's `STORAGE_*` variables; the S3 endpoint is public).
 
 ---
 
@@ -330,14 +342,21 @@ import mongoose from "mongoose";
 await mongoose.connect(conn.url);
 ```
 
-A Valkey (Redis protocol) has no shared credential: each connected site has its own login. Read it with the site's own key, the `GHAYMA_API_KEY` Ghayma injects into the site; the URL is the one the site already has as `REDIS_URL` (or `REDIS_URL_<NAME>` when the project has several Valkeys). An account token gets `409 no_shared_credential`.
-
 ```ts
-// Valkey with ioredis
+// Valkey (Redis protocol) with ioredis
 import Redis from "ioredis";
 const cache = await ghayma.database.getConnection("valkey-id"); // redis://c_…@…:6379/0
 const redis = new Redis(cache.url);
 ```
+
+`getCredentials` and `getConnection` answer only the site's own key, the `GHAYMA_API_KEY` Ghayma injects into a site connected to the database. They return that site's own login, the one its variables already carry (`DATABASE_URL`, `MONGODB_URI`, or `REDIS_URL` for a Valkey; `REDIS_URL_<NAME>` when the project has several Valkeys); the database's own login is never handed out. `conn.url` is the in-cluster address: it works from the site's pods. From your laptop: `ghayma connect --local`.
+
+| Answer | When |
+|---|---|
+| `409 no_own_credential` | The site's connection waits for a credential of its own: retry in a few minutes. |
+| `403 site_key_required` | A project-wide key (created under Project → Settings → API keys) has no connection of its own. |
+| `403 not_connected` | The site is not connected to the database. |
+| `410 shared_credentials_retired` | An account token: a database's own login is never handed out. |
 
 ### Details, credentials and metrics
 
@@ -347,6 +366,7 @@ const db = await ghayma.database.get("db-id");
 
 const creds = await ghayma.database.getCredentials("db-id");
 console.log(creds.host, creds.port, creds.username, creds.database);
+console.log(creds.level); // "read-only" or "connect"
 
 const metrics = await ghayma.database.getMetrics("db-id");
 console.log(metrics.active_connections, metrics.size_readable);

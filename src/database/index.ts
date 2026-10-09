@@ -21,10 +21,11 @@ export type {
 /**
  * Database — connect your app to its managed PostgreSQL, MongoDB or Valkey.
  *
- * Read the databases this key can see, get their credentials and a
+ * Read the databases this key can see, get your site's own credential and a
  * ready-to-use connection config, and read live metrics. Creating,
- * deleting, starting, stopping, exposing and backing up a database are
- * management: they live in the console and the `ghayma` CLI.
+ * deleting, starting, stopping and backing up a database, and access from
+ * outside Ghayma, are management: they live in the console and the `ghayma`
+ * CLI.
  *
  * @example
  * ```ts
@@ -60,7 +61,16 @@ export class DatabaseClient {
 
   // ── Credentials & Connection ───────────────────────────────
 
-  /** Get raw database credentials */
+  /**
+   * Get your site's own credential for a database.
+   *
+   * With the site's `GHAYMA_API_KEY`: that site's own credential.
+   * `409 no_own_credential` while the connection waits for one (retry in a
+   * few minutes). A deprecated account token gets `410`: a database's own
+   * login is never handed out. A project-wide key gets
+   * `403 site_key_required`, and a site not connected to the database
+   * `403 not_connected`.
+   */
   async getCredentials(databaseId: string): Promise<DatabaseCredentials> {
     const res = await this.http.get<Record<string, unknown>>(
       `/api/v1/databases/${databaseId}/credentials`,
@@ -72,6 +82,10 @@ export class DatabaseClient {
 
   /**
    * Get a parsed connection config — ready to use with your ORM or driver.
+   *
+   * The site's own login on the in-cluster address, as `getCredentials`
+   * reads it: it works from the site's pods. From a laptop, use
+   * `ghayma connect --local`.
    *
    * @example
    * ```ts
@@ -85,26 +99,20 @@ export class DatabaseClient {
    * const conn = await client.database.getConnection("mongo-id");
    * await mongoose.connect(conn.url);
    *
-   * // With ioredis — a Valkey answers only a site's own key, with that site's login
+   * // With ioredis
    * const conn = await client.database.getConnection("valkey-id");
    * const redis = new Redis(conn.url);
    * ```
    */
   async getConnection(databaseId: string): Promise<ConnectionConfig> {
     const creds = await this.getCredentials(databaseId);
-
-    // External access is opt-in; when it's enabled, return the externally-
-    // reachable URL/host/port so the connection works off-cluster. Otherwise
-    // use the in-cluster ones. The backend always provides internal_url, so the
-    // URL is never empty (the old manual fallback read a non-existent field).
-    const external = creds.external_access && !!creds.external_url;
     return {
-      url: (external ? creds.external_url : creds.internal_url) || "",
-      host: (external ? creds.external_host : creds.host) || "",
-      port: (external ? creds.external_port : creds.port) || 0,
-      username: creds.username || "",
-      password: creds.password || "",
-      database: creds.database || "",
+      url: creds.internal_url,
+      host: creds.host,
+      port: creds.port,
+      username: creds.username,
+      password: creds.password,
+      database: creds.database,
     };
   }
 
