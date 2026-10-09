@@ -215,6 +215,16 @@ export const valkeyCredentials: DatabaseCredentials = {
 // @ts-expect-error removed
 export const noDatabaseExternal: Database["external_access"] = false;
 // @ts-expect-error removed
+export const noDatabaseExternalHost: Database["external_host"] = "";
+// @ts-expect-error removed
+export const noDatabaseExternalPort: Database["external_port"] = 0;
+// @ts-expect-error removed
+export const noCredentialsExternalAccess: DatabaseCredentials["external_access"] = false;
+// @ts-expect-error removed
+export const noCredentialsExternalHost: DatabaseCredentials["external_host"] = "";
+// @ts-expect-error removed
+export const noCredentialsExternalPort: DatabaseCredentials["external_port"] = 0;
+// @ts-expect-error removed
 export const noCredentialsExternalUrl: DatabaseCredentials["external_url"] = "";
 
 export const valkeyType: DatabaseType = "valkey";

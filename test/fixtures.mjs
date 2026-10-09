@@ -211,6 +211,20 @@ export const DATABASE_CREDENTIALS_SITE_KEY = {
   credential: "connection",
 };
 
+/** paas-api 856337f internal/databases/handler.go — siteCredentialBody, a MongoDB site key (connectionString: always a replica set) */
+export const MONGO_CREDENTIALS_SITE_KEY = {
+  type: "mongodb",
+  host: "my-mongo.databases.svc.cluster.local",
+  port: 27017,
+  username: "c_3f1a2b3c",
+  password: "s1te-pw",
+  database: "app",
+  internal_url:
+    "mongodb://c_3f1a2b3c:s1te-pw@my-mongo.databases.svc.cluster.local:27017/app?authSource=admin&replicaSet=rs0&directConnection=true",
+  level: "read-only",
+  credential: "connection",
+};
+
 /** paas-api 856337f internal/projectkeys/site_credentials.go — RefuseNoOwnCredential, a database */
 export const NO_OWN_CREDENTIAL = {
   error: "this site's connection to that database has no credential of its own yet — the platform gives it one as soon as the service can (it retries every ten minutes); retry later, or reconnect the site",

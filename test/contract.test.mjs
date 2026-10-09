@@ -23,6 +23,7 @@ import {
   DATABASE_CREDENTIALS_SITE_KEY,
   DATABASE_METRICS,
   DATABASE_METRICS_RESIZING,
+  MONGO_CREDENTIALS_SITE_KEY,
   NO_OWN_CREDENTIAL,
   VALKEY_DATABASE,
   VALKEY_DATABASE_ERROR,
@@ -203,6 +204,18 @@ test("database.getConnection with a site key returns internal_url as url", async
     password: DATABASE_CREDENTIALS_SITE_KEY.password,
     database: "app",
   });
+});
+
+test("database.getConnection with a MongoDB site key returns the replica-set URL", async () => {
+  stubFetch(MONGO_CREDENTIALS_SITE_KEY);
+
+  const conn = await client().database.getConnection("db-mongo");
+
+  assert.equal(conn.url, MONGO_CREDENTIALS_SITE_KEY.internal_url);
+  assert.match(conn.url, /^mongodb:\/\/c_3f1a2b3c:.+@my-mongo\.databases\.svc\.cluster\.local:27017\/app\?authSource=admin&replicaSet=rs0&directConnection=true$/);
+  assert.equal(conn.port, 27017);
+  assert.equal(conn.username, "c_3f1a2b3c");
+  assert.equal(conn.database, "app");
 });
 
 test("database.getCredentials with a site key surfaces its level and credential", async () => {

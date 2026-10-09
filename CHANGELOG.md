@@ -39,6 +39,8 @@ fields are gone.
 
 ### Removed
 
+**Breaking (types only):**
+
 - **`Database.external_access`, `external_host` and `external_port`**, and
   **`DatabaseCredentials.external_access`, `external_host`, `external_port`
   and `external_url`**: the backend no longer sends them. A system outside
@@ -49,7 +51,7 @@ fields are gone.
 ### Notes
 
 - Code that reads a removed field no longer compiles; drop the read, since
-  the value was never sent.
+  the value has not been sent since September 2026.
 - The README's migration table maps `storage.rotateCredentials()` and
   `database.rotateCredentials()` to `ghayma connections rotate`, which gives
   one app a new credential. `ghayma db expose` is retired.

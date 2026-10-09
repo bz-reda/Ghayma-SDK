@@ -115,7 +115,9 @@ The project API key is a secret and **never ships to a browser**: the client ent
 
 A **project API key** (`gsk_…`) is created in the console at **Project → Settings → API keys**. It is scoped to that one project, which is what an app running on Ghayma needs. Connected apps get it injected as `GHAYMA_API_KEY`, so `new Ghayma()` works with no arguments; elsewhere pass it as `apiKey`.
 
-An **account token** (`gh_…`) still works, but it acts as you across every project you can reach. Passing one as `apiToken` logs a warning once per process:
+`getCredentials` and `getConnection` take the site's own key, the one Ghayma injects as `GHAYMA_API_KEY`: a project-wide key gets `403 site_key_required`, and an account token `410 shared_credentials_retired`.
+
+An **account token** (`gh_…`) still works for the other methods, but it acts as you across every project you can reach. Passing one as `apiToken` logs a warning once per process:
 
 ```
 @ghayma/sdk: you are using an account token. It acts as you across every project;
