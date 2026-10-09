@@ -2,6 +2,28 @@
 
 Releases before 0.6.0 are documented in the git history.
 
+## 1.7.0
+
+The database types know managed Valkey.
+
+### Added
+
+- **`DatabaseType` includes `"valkey"`**, and the new **`ValkeyMode`**
+  (`"cache"` or `"store"`) is exported by the server entry.
+- **`Database.valkey_mode`**, present only for a Valkey.
+- **`Database.status_message`**: why a database is in `error`, for example a
+  Valkey that never became ready.
+- **`DatabaseStatus` includes `"resizing"`**, the status while a disk moves to
+  a new size.
+
+### Notes
+
+- A Valkey has no shared credential. `getCredentials` and `getConnection`
+  answer only a site's own key (the `GHAYMA_API_KEY` injected into a connected
+  site), with that site's login; an account token gets
+  `409 no_shared_credential`.
+- Every change is additive; existing code compiles unchanged.
+
 ## 1.6.0
 
 Server code can read the visitor's IP in one call, and `verify2FA` and
