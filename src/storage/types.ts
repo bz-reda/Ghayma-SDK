@@ -11,6 +11,8 @@ export interface Bucket {
   name: string;
   /** Underlying S3 bucket name — pass this as `Bucket` to an S3 client. */
   garage_bucket: string;
+  /** The S3 endpoint the bucket is reached on. No key travels with it: an app's key is in its `STORAGE_*` variables. */
+  endpoint?: string;
   status: BucketStatus;
   storage_used_bytes: number;
   storage_limit_bytes: number;
@@ -23,8 +25,10 @@ export interface Bucket {
 }
 
 /**
- * S3 credentials for a bucket — feed these straight into any S3 client
- * (`accessKeyId: access_key`, `secretAccessKey: secret_key`).
+ * A site's own S3 key for a bucket (GET /storage/:id/credentials): the key
+ * its `STORAGE_*` variables carry, never the bucket's own key. Feed it
+ * straight into any S3 client (`accessKeyId: access_key`,
+ * `secretAccessKey: secret_key`).
  */
 export interface BucketCredentials {
   endpoint: string;
@@ -33,6 +37,10 @@ export interface BucketCredentials {
   bucket: string;
   access_key: string;
   secret_key: string;
+  /** The connection's level (a site's managed key); a `read` key cannot write. */
+  level?: "read" | "read-write";
+  /** Always "connection": the site's own credential. */
+  credential?: "connection";
 }
 
 /** An object (file) in a bucket */

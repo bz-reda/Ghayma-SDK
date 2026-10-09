@@ -30,7 +30,7 @@ export interface Database {
   port: number;
   /** Absent for Valkey. */
   db_name?: string;
-  /** For Valkey, the platform's own user: apps connect with their site's credential. */
+  /** @deprecated not sent since October 2026 — the database's own login is never handed out. */
   username?: string;
   /** Sizing bracket from database_tiers — the persisted sizing decision. */
   tier_slug: string;
@@ -53,18 +53,14 @@ export interface Database {
   replica_set: boolean;
   /** Present only for Valkey. */
   valkey_mode?: ValkeyMode;
-  external_access: boolean;
-  /** Present only when external access is enabled. */
-  external_host?: string;
-  external_port?: number;
   created_at: string;
   updated_at: string;
 }
 
 /**
- * Database connection credentials (matches GET /databases/:id/credentials).
- * A Valkey has no shared credential: a site's own key reads that site's login
- * (`database` empty); an account token gets `409 no_shared_credential`.
+ * A site's own connection credential (GET /databases/:id/credentials): the
+ * login its runtime variables carry, never the database's own login. A
+ * Valkey's `database` is empty.
  */
 export interface DatabaseCredentials {
   type: DatabaseType;
@@ -75,11 +71,10 @@ export interface DatabaseCredentials {
   database: string;
   /** In-cluster connection string — always present. */
   internal_url: string;
-  external_access: boolean;
-  /** Present only when external access is enabled. */
-  external_host?: string;
-  external_port?: number;
-  external_url?: string;
+  /** The connection's level (a site's managed key). */
+  level?: "read-only" | "connect";
+  /** Always "connection": the site's own credential. */
+  credential?: "connection";
 }
 
 /** Live database metrics (GET /databases/:id/metrics). */

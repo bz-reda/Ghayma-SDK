@@ -16,11 +16,15 @@ import {
   AUTH_STATS,
   AUTH_USER,
   BUCKET,
-  BUCKET_CREDENTIALS,
+  BUCKET_CREDENTIALS_RETIRED,
+  BUCKET_CREDENTIALS_SITE_KEY,
   DATABASE,
+  DATABASE_CREDENTIALS_RETIRED,
+  DATABASE_CREDENTIALS_SITE_KEY,
   DATABASE_METRICS,
   DATABASE_METRICS_RESIZING,
-  NO_SHARED_CREDENTIAL,
+  MONGO_CREDENTIALS_SITE_KEY,
+  NO_OWN_CREDENTIAL,
   VALKEY_DATABASE,
   VALKEY_DATABASE_ERROR,
   VALKEY_METRICS,
@@ -59,15 +63,30 @@ test("auth.listUsers sends per_page, the parameter the handler reads", async () 
 
 // ── Responses the backend actually returns ─────────────────────
 
-test("storage.getCredentials returns the backend's key names", async () => {
-  stubFetch({ credentials: BUCKET_CREDENTIALS });
+test("storage.getCredentials with a site key returns the site's own key", async () => {
+  const calls = stubFetch({ credentials: BUCKET_CREDENTIALS_SITE_KEY });
 
   const creds = await client().storage.getCredentials("bucket-1");
 
-  assert.equal(creds.access_key, BUCKET_CREDENTIALS.access_key);
-  assert.equal(creds.secret_key, BUCKET_CREDENTIALS.secret_key);
-  assert.equal(creds.bucket, BUCKET_CREDENTIALS.bucket);
-  assert.deepEqual(Object.keys(creds).sort(), Object.keys(BUCKET_CREDENTIALS).sort());
+  assert.equal(calls[0].url.pathname, "/api/v1/storage/bucket-1/credentials");
+  assert.equal(creds.access_key, BUCKET_CREDENTIALS_SITE_KEY.access_key);
+  assert.equal(creds.secret_key, BUCKET_CREDENTIALS_SITE_KEY.secret_key);
+  assert.equal(creds.bucket, BUCKET_CREDENTIALS_SITE_KEY.bucket);
+  assert.equal(creds.level, "read-write");
+  assert.equal(creds.credential, "connection");
+  assert.deepEqual(Object.keys(creds).sort(), Object.keys(BUCKET_CREDENTIALS_SITE_KEY).sort());
+});
+
+test("storage.getCredentials with an account token throws 410 shared_credentials_retired", async () => {
+  stubFetch(BUCKET_CREDENTIALS_RETIRED, 410);
+
+  await assert.rejects(client().storage.getCredentials("bucket-1"), (err) => {
+    assert.ok(err instanceof GhaymaError);
+    assert.equal(err.status, 410);
+    assert.equal(err.code, "shared_credentials_retired");
+    assert.equal(err.message, BUCKET_CREDENTIALS_RETIRED.error);
+    return true;
+  });
 });
 
 test("storage.upload returns the key the backend echoes back", async () => {
@@ -90,6 +109,7 @@ test("storage.getBucket surfaces the real usage/limit fields", async () => {
   assert.equal(bucket.storage_used_bytes, BUCKET.storage_used_bytes);
   assert.equal(bucket.storage_limit_bytes, BUCKET.storage_limit_bytes);
   assert.equal(bucket.status, "active");
+  assert.equal(bucket.endpoint, BUCKET.endpoint);
 });
 
 test("database.get surfaces type + tier fields, not the invented ones", async () => {
@@ -99,7 +119,6 @@ test("database.get surfaces type + tier fields, not the invented ones", async ()
 
   assert.equal(db.type, "postgres");
   assert.equal(db.storage_used_bytes, DATABASE.storage_used_bytes);
-  assert.equal(db.external_access, false);
   assert.equal(db.tier_slug, "xs");
   assert.equal(db.disk_gb, 1);
   assert.equal(db.backup_tier_slug, "weekly");
@@ -169,14 +188,66 @@ test("database.getConnection with a site key returns the site's own Valkey URL",
   assert.equal(conn.database, "");
 });
 
-test("database.getCredentials on a Valkey without a site key throws no_shared_credential", async () => {
-  stubFetch(NO_SHARED_CREDENTIAL, 409);
+// ── The site's own credential ──────────────────────────────────
 
-  await assert.rejects(client().database.getCredentials("db-vk"), (err) => {
+test("database.getConnection with a site key returns internal_url as url", async () => {
+  const calls = stubFetch(DATABASE_CREDENTIALS_SITE_KEY);
+
+  const conn = await client().database.getConnection("db-1");
+
+  assert.equal(calls[0].url.pathname, "/api/v1/databases/db-1/credentials");
+  assert.deepEqual(conn, {
+    url: DATABASE_CREDENTIALS_SITE_KEY.internal_url,
+    host: DATABASE_CREDENTIALS_SITE_KEY.host,
+    port: 5432,
+    username: "c_3f1a2b3c",
+    password: DATABASE_CREDENTIALS_SITE_KEY.password,
+    database: "app",
+  });
+});
+
+test("database.getConnection with a MongoDB site key returns the replica-set URL", async () => {
+  stubFetch(MONGO_CREDENTIALS_SITE_KEY);
+
+  const conn = await client().database.getConnection("db-mongo");
+
+  assert.equal(conn.url, MONGO_CREDENTIALS_SITE_KEY.internal_url);
+  assert.match(conn.url, /^mongodb:\/\/c_3f1a2b3c:.+@my-mongo\.databases\.svc\.cluster\.local:27017\/app\?authSource=admin&replicaSet=rs0&directConnection=true$/);
+  assert.equal(conn.port, 27017);
+  assert.equal(conn.username, "c_3f1a2b3c");
+  assert.equal(conn.database, "app");
+});
+
+test("database.getCredentials with a site key surfaces its level and credential", async () => {
+  stubFetch(DATABASE_CREDENTIALS_SITE_KEY);
+
+  const creds = await client().database.getCredentials("db-1");
+
+  assert.equal(creds.level, "connect");
+  assert.equal(creds.credential, "connection");
+  assert.deepEqual(Object.keys(creds).sort(), Object.keys(DATABASE_CREDENTIALS_SITE_KEY).sort());
+});
+
+test("database.getConnection while the connection waits throws 409 no_own_credential", async () => {
+  stubFetch(NO_OWN_CREDENTIAL, 409);
+
+  await assert.rejects(client().database.getConnection("db-1"), (err) => {
     assert.ok(err instanceof GhaymaError);
     assert.equal(err.status, 409);
-    assert.equal(err.code, "no_shared_credential");
-    assert.equal(err.message, NO_SHARED_CREDENTIAL.error);
+    assert.equal(err.code, "no_own_credential");
+    assert.equal(err.message, NO_OWN_CREDENTIAL.error);
+    return true;
+  });
+});
+
+test("database.getCredentials with an account token throws 410 shared_credentials_retired", async () => {
+  stubFetch(DATABASE_CREDENTIALS_RETIRED, 410);
+
+  await assert.rejects(client().database.getCredentials("db-1"), (err) => {
+    assert.ok(err instanceof GhaymaError);
+    assert.equal(err.status, 410);
+    assert.equal(err.code, "shared_credentials_retired");
+    assert.equal(err.message, DATABASE_CREDENTIALS_RETIRED.error);
     return true;
   });
 });
